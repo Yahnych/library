@@ -1,0 +1,9 @@
+[submodule "plugins/traceur-compiler"]
+	path = plugins/traceur-compiler
+	url = https://github.com/google/traceur-compiler.git
+[submodule "plugins/Font.js"]
+	path = plugins/Font.js
+	url = https://github.com/Pomax/Font.js.git
+[submodule "plugins/1579671"]
+	path = plugins/1579671
+	url = https://gist.github.com/1579671.git
