@@ -1,3 +1,6 @@
+//Dependencies
+import "library/plugins/audioContextPolyfill"
+
 //Create the audio context
 var actx = new AudioContext();
 

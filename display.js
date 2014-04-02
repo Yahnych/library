@@ -7,6 +7,10 @@ creating and rendering canvas based sprites.
 
 */
 
+//Dependencies
+//requestAnimationFrame polyfill
+import "library/plugins/rAF";
+
 /*
 makeCanvas
 ----------
@@ -162,10 +166,16 @@ export class Circle extends Sprite {
   }
   //Diameter
   get diameter() {return this.width}
-  set diameter(value) {this.width = value}
+  set diameter(value) {
+    this.width = value;
+    this.height = value;
+  }
   //Radius
   get radius() {return this.halfWidth}
-  set radius(value) {this.width = value * 2} 
+  set radius(value) {
+    this.width = value * 2;
+    this.height = value * 2;
+  } 
 }
 
 /*
@@ -205,6 +215,31 @@ export class Tile extends Sprite {
       );
     }
   }
+}
+
+/*
+RoundTile
+-----
+
+The same as the Tile class, but with added `diameter` and
+`radius` properties. Use it for round tile sprites so that
+you can use `radius` and `diameter` properties in collision functions
+
+*/
+    
+export class RoundTile extends Tile {
+  //Diameter
+  get diameter() {return this.width}
+  set diameter(value) {
+    this.width = value;
+    this.height = value;
+  }
+  //Radius
+  get radius() {return this.halfWidth}
+  set radius(value) {
+    this.width = value * 2;
+    this.height = value * 2;
+  } 
 }
 
 /*
@@ -283,6 +318,7 @@ export function render(canvas) {
 
       //Rectangle
       if (sprite instanceof Rectangle) {      
+        ctx.save();
         //Add an optional camera
         if (camera && camera.initialized && sprite.scroll) {
           ctx.translate(-camera.p.x, -camera.p.y);
@@ -402,14 +438,85 @@ an also from any other arrays that it might in
 
 */
 
-export let removeSprite = (sprite, array = undefined) => {
-  //Remove the sprite from a game array that it might be in
-  if (array) {
-    array.splice(array.indexOf(sprite), 1);
+export function removeSprite(sprite, ...arrays) {
+  //Remove the sprite from any game arrays that it might be in
+  if(arrays) {
+    arrays.forEach((array) => {
+      array.splice(array.indexOf(sprite), 1);
+    });
   }
   //Remove the sprite from the `sprites` array
   sprites.splice(sprites.indexOf(sprite), 1);
-};
+}
+
+/*
+shoot
+-----
+
+A function that lets sprites fire bullets.
+Use it like this:
+
+    shoot({
+      shooter: box,         //The sprite doing the shooting
+      bulletDiameter: 10,   //The bullet's diameter
+      bulletColor: "red",   //The bullet's color
+      bulletSpeed: 5,       //The speed of the bullet in pixels/frame
+      offsetFromCenter: 32, //Distance of the bullet from the sprite's center
+      bulletArray: bullets  //An array that the bullet belongs to
+    });
+
+To pevent a bullet from being fired more than once if a key is
+being held down, set the key's `alreadyPressed` value to
+`true`
+
+    if (keyboard.space.isDown && !keyboard.space.alreadyPressed) {
+      shoot({
+        shooter: box,
+        bulletDiameter: 10,
+        bulletColor: "red",
+        bulletSpeed: 5,
+        offsetFromCenter: 32,
+        bulletArray: bullets
+      });
+      keyboard.space.alreadyPressed = true;
+    }
+
+`alreadyPressed` will be re-set to `false` when the key is realeased
+(See the `keyboard` object in the library/interactive
+module for more details.)
+
+*/
+
+export function shoot(config) {
+  let shooter = config.shooter,
+      offsetFromCenter = config.offsetFromCenter || 0,
+      diameter = config.bulletDiameter || 8,
+      fillStyle = config.bulletColor || "red",
+      radius = config.bulletDiameter / 2 || 4,
+      bulletSpeed = config.bulletSpeed || 5,
+      bulletArray = config.bulletArray;
+  //Make a bullet sprite
+  let bullet = new Circle({
+    diameter: diameter,
+    fillStyle: fillStyle,
+    //Use the shooter's rotation to accurately position 
+    //the bullet at the end of the turret
+    p: {
+      x: shooter.center.x - radius 
+          + (offsetFromCenter * Math.cos(shooter.rotation)),
+      y: shooter.center.y - radius 
+          + (offsetFromCenter * Math.sin(shooter.rotation))
+    },
+    //Set the bullet's velocity to 7 pixels per frame, in the
+    //direction that the shooter is rotated in
+    v: {
+      x: Math.cos(shooter.rotation) * bulletSpeed,
+      y: Math.sin(shooter.rotation) * bulletSpeed
+    }
+  });
+  //Push the bullet into the `bullets` arrays
+  bulletArray.push(bullet);
+}
 
 /*
 progressBar
@@ -494,7 +601,7 @@ First create a sprite with a states property. The states property
 constains sub-objects that define the x and y positions of animation
 frames on the spritesheet.
 
-    elf = image({
+    elf = new Tile({
       p: {x: 96, y: 96},
       width: 64,
       height: 64,

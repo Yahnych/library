@@ -47,7 +47,6 @@ the shape as a circle.
 */
 
 export function hitTestPoint(point, sprite) {
-  "use strict";
 
   let shape, left, right, top, bottom, v, magnitude, hit;
 
@@ -100,7 +99,6 @@ b. A sprite object with `center.x`, `center.y` and `radius`.
 */
 
 export function hitTestCircle(c1, c2) {
-  "use strict";
   let v, magnitude, totalRadii, hit;
 
   //Calculate the vector between the circles’ center points
@@ -138,20 +136,14 @@ The sprites can contain an optional mass property that should be greater than 1.
 
 */
 
-export function circleCollision(c1, c2, bounce) {
-  "use strict";
+export function circleCollision(c1, c2, bounce = true) {
   let magnitude, combinedRadii, overlap,
-    v = {}, d = {}, s = {},
-    hit = false;
-
-  if (bounce === undefined) {
-    bounce = true;
-  }
+      v = {}, d = {}, s = {},
+      hit = false;
 
   //Calculate the vector between the circles’ center points
   v.x = c2.center.x - c1.center.x;
   v.y = c2.center.y - c1.center.y;
-
 
   //Find the distance between the circles by calculating
   //the vector's magnitude (how long the vector is) 
@@ -214,7 +206,6 @@ The sprites can contain an optional mass property that should be greater than 1.
 */
 
 export function movingCircleCollision(c1, c2) {
-  "use strict";
   let combinedRadii, overlap, xSide, ySide,
       s = {
         v: {},
@@ -344,9 +335,8 @@ b. A sprite object with `center.x`, `center.y`, `halfWidth` and `halfHeight` pro
 */
 
 export function hitTestRectangle(r1, r2) {
-  "use strict";
   let hit, combinedHalfWidths, combinedHalfHeights, v = {};
-  //A letiable to determine whether there's a collision
+  //A variable to determine whether there's a collision
   hit = false;
 
   //Calculate the distance vector
@@ -388,17 +378,12 @@ c. Optional: true or false to indicate whether or not the first sprite
 should bounce off the second sprite.
 */
 
-export function rectangleCollision(r1, r2, bounce) {
-  "use strict";
+export function rectangleCollision(r1, r2, bounce = false) {
   let collision, combinedHalfWidths, combinedHalfHeights,
-    overlap = {},
-    v = {};
-  //Set bounce to a default value of false if it's not specified
-  if (typeof bounce === "undefined") {
-    bounce = false;
-  }
+      overlap = {},
+      v = {};
 
-  //A letiable to tell us which side the 
+  //A variable to tell us which side the 
   //collision is occurring on
   collision = "";
 
@@ -510,16 +495,15 @@ be used to dampen the bounce effect.
 */
 
 function bounceOffSurface(o, s) {
-  "use strict";
   let dp1, dp2,
-    p1 = {
-      v: {}
-    },
-    p2 = {
-      v: {}
-    },
-    bounce = {},
-    mass = o.mass || 1;
+      p1 = {
+        v: {}
+      },
+      p2 = {
+        v: {}
+      },
+      bounce = {},
+      mass = o.mass || 1;
 
   //1. Calculate the collision surface's properties
   //Find the surface vector's left normal
@@ -590,15 +574,15 @@ hitTestTile returns a collision object that contains these two properties:
 */
 
 export function hitTestTile(config) {
-  //The letiables we'll need
+  //The variables we'll need
   let sprite = config.sprite,
-    tileToFind = config.tileToFind,
-    array = config.array,
-    pointsToCheck = config.pointsToCheck || "some",
-    mapWidth = config.mapWidth,
-    tileWidth = config.tileWidth,
-    tileHeight = config.tileHeight,
-    points = {};
+      tileToFind = config.tileToFind,
+      array = config.array,
+      pointsToCheck = config.pointsToCheck || "some",
+      mapWidth = config.mapWidth,
+      tileWidth = config.tileWidth,
+      tileHeight = config.tileHeight,
+      points = {};
 
   //A collision object that will be returned by this function.
   //`collision.hit` will be true or false depending on whether a collision is detected.

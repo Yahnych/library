@@ -10,7 +10,8 @@ sprite prototype objects can use this code
 */
 
 //Dependencies
-import Sound from "sound";
+import Sound from "library/sound";
+import "library/plugins/Font.js/Font";
 
 /*
 distance

@@ -3,17 +3,24 @@ interactive.js
 ==============
 
 This JavaScript file contains objects useful for
-adding interactivity to sprites. See the sprites.js file for
-sprite prototype objects can use this code
+adding interactivity to sprites. See the display.js file for
+sprite classes that can use this code
 
 */
 
+//Dependencies
+//Hand.js (a polyfill for PointerEvents)
+import "library/plugins/hand.minified-1.3.7";
+//`sprites` array for the pointer's dragAndDrop function
+import {sprites} from "library/display";
+//`hitTestPoint` for the pointer's dragAndDrop
+import {hitTestPoint} from "library/collision";
 
 /*
 pointer
 -------
 
-A pointer object for mouse of touch based interfaces.
+A pointer object for mouse or touch based interfaces.
 Initialize it like this:
 
     pointer.initialize();
@@ -25,7 +32,7 @@ You can initialize it with configuration options like this:
       cursor: "none"
     });
     
-You can then check for key pointer like this:
+You can then check for pointer events like this:
 
     if (pointer.tapped) {//...};
     if (pointer.isUp) {//...};
@@ -34,14 +41,14 @@ You can then check for key pointer like this:
 The pointer also has a drag and drop feature. To implement it,
 first set a sprite's draggable property to true:
 
-    let sprite = rectangle.make({
+    let sprite = new Rectangle({
       draggable: true
     });
     
-Then tell the pointer which array of sprites should be be used
-for drag-and-drop.
+Run the pointer's `dragAndDrop` function inside the game loop,
+with a reference to the canvas
 
-    pointer.dragAndDrop(sprites);
+    pointer.dragAndDrop(canvas);
     
 The pointer has a property called `dragSprite` that won't be null
 if the pointer is dragging a sprite. Test for it like this:
@@ -53,6 +60,7 @@ if the pointer is dragging a sprite. Test for it like this:
 The pointer's p.x and p.y properties tells you its postion:
 
     pointer.p.x
+    pointer.p.y
 
 */
 export let pointer = {
@@ -113,10 +121,10 @@ export let pointer = {
   },
   initialize(config) {
     "use strict";
-    //Set the configuration letiables
+    //Set the configuration variables
     let config = config || {},
-      element = config.element || document.querySelector("canvas"),
-      cursor = config.cursor || "auto";
+        element = config.element || document.querySelector("canvas"),
+        cursor = config.cursor || "auto";
 
     //Bind the events to the handlers
     element.addEventListener(
@@ -135,7 +143,7 @@ export let pointer = {
     //Hide the mouse arrow
     element.style.cursor = cursor;
   },
-  dragAndDrop(sprites) {
+  dragAndDrop(canvas) {
     if (this.isDown) {
       //Capture the co-ordinates at which the pointer was 
       //alreadyPressed down and find out if it's touching a sprite
@@ -186,13 +194,13 @@ export let pointer = {
 };
 
 /*
-key
+keyboard
 ---
 
-A key object for keyboard interactivity.
+A keyboard object for keyboard interactivity.
 Initialize it with the names of the keys and their code values like this:
 
-    key.initialize({
+    keyboard.initialize({
       space: 32,
       left: 37,
       up: 38,
@@ -202,13 +210,13 @@ Initialize it with the names of the keys and their code values like this:
     
 You can then check for key actions like this:
 
-    if (key.space.isUp) {//...};
-    if (key.left.isDown) {//...}
+    if (keyboard.space.isUp) {//...};
+    if (keyboard.left.isDown) {//...}
 
 */
 
 export let keyboard = {
-  initialize: function(config) {
+  initialize(config) {
     //Create new objects for each key
     if (config !== undefined) {
       Object.keys(config).forEach((key) => {
