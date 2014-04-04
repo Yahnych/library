@@ -2,7 +2,7 @@
 import "library/plugins/audioContextPolyfill"
 
 //Create the audio context
-var actx = new AudioContext();
+let actx = new AudioContext();
 
 export default class {
   constructor(config) {
@@ -25,9 +25,7 @@ export default class {
     this.startTime = 0;
     this.startOffset = 0;
     //Add the confguration object properties
-    Object.keys(config).forEach((key) => {
-      this[key] = config[key];
-    });
+    Object.assign(this, config);
     //Load the sound
     this.load();   
   }
@@ -58,10 +56,11 @@ export default class {
     this.isPlaying = true;
   }
   pause() {
-    //Pause the sound if it's playing, and caluclate the
+    //Pause the sound if it's playing, and calculate the
     //`startOffset` to save the current position 
+    console.log("Paused")
     if (this.isPlaying) {
-      this.soundNode.stop();
+      this.soundNode.stop(0);
       this.startOffset += this.actx.currentTime - this.startTime;
       this.isPlaying = false;
     }
@@ -70,15 +69,17 @@ export default class {
     //Stop the sound if it's playing, reset the start and offset times,
     //then call the `play` method again
     if (this.isPlaying) {
-      this.soundNode.stop();
+      this.soundNode.stop(0);
     }
     this.startOffset = 0,
     //this.startTime = 0,
     this.play();
   }
   playFrom(value) {
+    //Stop the sound if it's playing, set the offset time to `value`,
+    //which is a number in seconds, then call the `play` method again
     if (this.isPlaying) {
-      this.soundNode.stop();
+      this.soundNode.stop(0);
     }
     this.startOffset = value;
     this.play();
@@ -100,14 +101,14 @@ export default class {
     //panning we're only interested in the the x coordinate, 
     //the first one. However, for a natural effect, the z
     //value also has to be set proportionately.
-    var x = value,
+    let x = value,
         y = 0,
         z = 1 - Math.abs(x);
     this.panNode.setPosition(x, y, z);
     this.panValue = value;
   }
   load() {
-    var xhr = new XMLHttpRequest();
+    let xhr = new XMLHttpRequest();
     //Use xhr to load the sound file
     xhr.open("GET", this.source, true);
     xhr.responseType = "arraybuffer";

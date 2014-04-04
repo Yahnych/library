@@ -234,6 +234,7 @@ export let assets = {
         //Send the request to load the file
         xhr.send();
       }
+
       //Load audio files that have file extensions that match 
       //the audioExtensions array 
       else if (this.audioExtensions.indexOf(extension) !== -1) {
@@ -250,6 +251,7 @@ export let assets = {
         console.log("Audio data loaded");
         console.log(soundSprite.name);
       }
+
       //Display a message if a file type isn't recognized
       else {
         throw new Error("File type not recognized: " + source);
