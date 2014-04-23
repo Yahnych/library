@@ -385,7 +385,7 @@ export function rectangleCollision(r1, r2, bounce = false) {
 
   //A variable to tell us which side the 
   //collision is occurring on
-  collision = "";
+  let collision;
 
   //Calculate the distance vector
   v.x = r1.center.x - r2.center.x;
@@ -470,11 +470,9 @@ export function rectangleCollision(r1, r2, bounce = false) {
       }
     } else {
       //No collision
-      collision = "none";
     }
   } else {
     //No collision
-    collision = "none";
   }
 
   return collision;
@@ -663,5 +661,50 @@ export function hitTestTile(config) {
 
   //Return the collision object that contains the true/false
   //value of `collision.hit` and the map array location in `collision.index`
+  return collision;
+}
+
+/*
+Contain
+-------
+
+Keep a sprite contained within a rectangular area.
+The first argument is a sprite, the next 4 arguments
+define a rectangular area
+
+    contain(sprite, containerX, containerY, containerWidth, containerHeight, bounce);
+
+*/
+
+export function contain(s, x, y, width, height, bounce = false, extra = undefined) {
+  let collision;
+
+  //Left
+  if (s.p.x < x) {
+    if (bounce) s.v.x *= -1;
+    s.p.x = x;
+    collision = "left";
+  }
+  //Top
+  if (s.p.y < y) {
+    if (bounce) s.v.y *= -1;
+    s.p.y = y;
+    collision = "top";
+  }
+  //Right
+  if (s.p.x + s.width > width) {
+    if (bounce) s.v.x *= -1;
+    s.p.x = width - s.width;
+    collision = "right";
+  }
+  //Bottom
+  if (s.p.y + s.height > height) {
+    if (bounce) s.v.y *= -1;
+    s.p.y = height - s.height;
+    collision = "bottom";
+  }
+
+  if (collision && extra) extra(collision);
+
   return collision;
 }

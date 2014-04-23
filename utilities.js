@@ -62,6 +62,18 @@ export let ease = (follower, leader, speed) => {
   }
 }
 
+export let easeProperty = (start, end, speed) => {
+  //Calculate the distance
+  let distance = end - start;
+  //Move the follower if it's more than 1 pixel 
+  //away from the leader
+  if (distance >= 1) {
+    return distance * speed;
+  } else {
+    return 0;
+  }
+}
+
 /*
 follow
 ----------------
@@ -276,4 +288,49 @@ export let assets = {
     }
   }
 };
+
+/*
+Wait
+----
+
+Lets you set up a timed sequence of events
+
+    wait(1000)
+      .then(() => console.log("One"))
+      .then(() => wait(1000))
+      .then(() => console.log("Two"))
+      .then(() => wait(1000))
+      .then(() => console.log("Three"))
+
+*/
+
+export function wait(duration = 0) {
+  return new Promise((resolve, reject) => {
+    setTimeout(resolve, duration);
+  });
+}
+
+/*
+Move
+----
+
+Move a sprite by adding it's velocity to it's position
+
+    move(sprite);
+*/
+
+export function move(...sprites) {
+  if (sprites.length === 1) {
+    let s = sprites[0];
+    s.p.x += s.v.x;
+    s.p.y += s.v.y;
+  }
+  else {
+    for (let i = 0; i < sprites.length; i++) {
+      let s = sprites[i];
+      s.p.x += s.v.x;
+      s.p.y += s.v.y;
+    }
+  }
+}
 

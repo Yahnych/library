@@ -120,7 +120,6 @@ export let pointer = {
     this.isDown = false;
   },
   initialize(config) {
-    "use strict";
     //Set the configuration variables
     let config = config || {},
         element = config.element || document.querySelector("canvas"),
