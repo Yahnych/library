@@ -12,6 +12,7 @@ sprite prototype objects can use this code
 //Dependencies
 import Sound from "library/sound";
 import "library/plugins/Font.js/Font";
+import {TWEEN} from "library/plugins/Tween";
 
 /*
 distance
@@ -182,98 +183,117 @@ export let assets = {
   //The load method creates and loads all the assets. Use it like this:
   //`assets.load(["images/anyImage.png", "fonts/anyFont.otf"]);`
   load(sources) {
-    console.log("Loading assets...");
-    //Find the number of files that need to be loaded
-    this.toLoad = sources.length;
-   
-    sources.forEach((source) => {
-      //Find the file extension of the asset
-      let extension = source.split('.').pop();
-
-      //Load images that have file extensions that match. 
-      //the imageExtensions array
-      if (this.imageExtensions.indexOf(extension) !== -1) {
-        //Create a new image and add a loadHandler
-        let image = new Image();
-        image.addEventListener("load", this.loadHandler.bind(this), false);
-        //Get the image file name
-        image.name = source.split("/").pop();
-        //Assign the image as a property of the assets object so
-        //we can access it like this: `assets["imageName.png"]`
-        this[image.name] = image;
-        //Set the image's src property so we can start loading the image
-        image.src = source;
+    return new Promise((resolve) => {
+      let loadHandler = () => {
+        this.loaded += 1;
+        console.log(this.loaded);
+        //Check whether everything has loaded
+        if (this.toLoad === this.loaded) {
+          //If it has, run the callback function that was
+          //assigned to the `whenLoaded` property
+          //this.whenLoaded();
+          this.toLoad = 0;
+          this.loaded = 0;      
+          console.log("Assets finished loading");
+          //Resolve the promise
+          resolve();
+        }
       }
+      console.log("Loading assets...");
+      //Find the number of files that need to be loaded
+      this.toLoad = sources.length;
+    
+      sources.forEach((source) => {
+        //Find the file extension of the asset
+        let extension = source.split('.').pop();
 
-      //Load fonts that have file extensions that match 
-      //the fontExtensions array 
-      else if (this.fontExtensions.indexOf(extension) !== -1) {
-        //Create a new font using font.js (https://github.com/Pomax/Font.js)
-        let font = new Font();
-        //Use the font's file name as the fontFamily name
-        font.fontFamily = source.split("/").pop().split(".")[0];
-        //Set the loadHander and assign the source to start 
-        //loading the font
-        font.onload = this.loadHandler.bind(this);
-        font.src = source;
-      }
+        //Load images that have file extensions that match. 
+        //the imageExtensions array
+        if (this.imageExtensions.indexOf(extension) !== -1) {
+          //Create a new image and add a loadHandler
+          let image = new Image();
+          //image.addEventListener("load", this.loadHandler.bind(this), false);
+          image.addEventListener("load", loadHandler.bind(this), false);
+          //Get the image file name
+          image.name = source.split("/").pop();
+          //Assign the image as a property of the assets object so
+          //we can access it like this: `assets["imageName.png"]`
+          this[image.name] = image;
+          //Set the image's src property so we can start loading the image
+          image.src = source;
+        }
 
-      //Load json files that have file extensions that match 
-      //the jsonExtensions array 
-      else if (this.jsonExtensions.indexOf(extension) !== -1) {
-        //Create a new xhr object and an object to store the file
-        let xhr = new XMLHttpRequest();
-        let file = {};
-        //Use xhr to load the JSON file
-        xhr.open("GET", source, true);
-        xhr.addEventListener("readystatechange", () => {
-          //Check to make sure the file has loaded properly
-          if (xhr.status === 200 && xhr.readyState === 4) {
-            //Convert the JSON data file into an ordinary object
-            file = JSON.parse(xhr.responseText);
-            //Get the file name
-            file.name = source.split("/").pop();
-            //Assign the file as a property of the assets object so
-            //we can access it like this: `assets["file.json"]`
-            this[file.name] = file;
-            //console.log("JSON data loaded");
-            //console.log(file);
-            //console.log(file.name);
-            //Alert the load handler that the file has loaded
-            this.loadHandler();
-          }
-        });
-        //Send the request to load the file
-        xhr.send();
-      }
+        //Load fonts that have file extensions that match 
+        //the fontExtensions array 
+        else if (this.fontExtensions.indexOf(extension) !== -1) {
+          //Create a new font using font.js (https://github.com/Pomax/Font.js)
+          let font = new Font();
+          //Use the font's file name as the fontFamily name
+          font.fontFamily = source.split("/").pop().split(".")[0];
+          //Set the loadHander and assign the source to start 
+          //loading the font
+          font.onload = loadHandler.bind(this);
+          font.src = source;
+        }
 
-      //Load audio files that have file extensions that match 
-      //the audioExtensions array 
-      else if (this.audioExtensions.indexOf(extension) !== -1) {
-        //Create a sound sprite
-        let soundSprite = new Sound({
-          source: source,
-          loadHandler: this.loadHandler.bind(this)
-        });
-        //Get the sound file name
-        soundSprite.name = source.split("/").pop();
-        //Assign the sound as a property of the assets object so
-        //we can access it like this: `assets["sound.mp3"]`
-        this[soundSprite.name] = soundSprite;
-        console.log("Audio data loaded");
-        console.log(soundSprite.name);
-      }
+        //Load json files that have file extensions that match 
+        //the jsonExtensions array 
+        else if (this.jsonExtensions.indexOf(extension) !== -1) {
+          //Create a new xhr object and an object to store the file
+          let xhr = new XMLHttpRequest();
+          let file = {};
+          //Use xhr to load the JSON file
+          xhr.open("GET", source, true);
+          xhr.addEventListener("readystatechange", () => {
+            //Check to make sure the file has loaded properly
+            if (xhr.status === 200 && xhr.readyState === 4) {
+              //Convert the JSON data file into an ordinary object
+              file = JSON.parse(xhr.responseText);
+              //Get the file name
+              file.name = source.split("/").pop();
+              //Assign the file as a property of the assets object so
+              //we can access it like this: `assets["file.json"]`
+              this[file.name] = file;
+              //console.log("JSON data loaded");
+              //console.log(file);
+              //console.log(file.name);
+              //Alert the load handler that the file has loaded
+              loadHandler();
+            }
+          });
+          //Send the request to load the file
+          xhr.send();
+        }
 
-      //Display a message if a file type isn't recognized
-      else {
-        throw new Error("File type not recognized: " + source);
-      }
+        //Load audio files that have file extensions that match 
+        //the audioExtensions array 
+        else if (this.audioExtensions.indexOf(extension) !== -1) {
+          //Create a sound sprite
+          let soundSprite = new Sound({
+            source: source,
+            //loadHandler: this.loadHandler.bind(this)
+            loadHandler: loadHandler.bind(this)
+          });
+          //Get the sound file name
+          soundSprite.name = source.split("/").pop();
+          //Assign the sound as a property of the assets object so
+          //we can access it like this: `assets["sound.mp3"]`
+          this[soundSprite.name] = soundSprite;
+          console.log("Audio data loaded");
+          console.log(soundSprite.name);
+        }
+
+        //Display a message if a file type isn't recognized
+        else {
+          throw new Error("File type not recognized: " + source);
+        }
+      });
     });
-  },
+  }
 
   //The loadHandler will be called each time an 
   //asset finishes loading
-
+  /*
   loadHandler() {
     this.loaded += 1;
     console.log(this.loaded);
@@ -281,12 +301,14 @@ export let assets = {
     if (this.toLoad === this.loaded) {
       //If it has, run the callback function that was
       //assigned to the `whenLoaded` property
-      this.whenLoaded();
+      //this.whenLoaded();
       this.toLoad = 0;
       this.loaded = 0;      
       console.log("Assets finished loading");
+      resolve();
     }
   }
+  */
 };
 
 /*
@@ -334,3 +356,32 @@ export function move(...sprites) {
   }
 }
 
+//Tween functions
+
+export let slide = (sprite, x, y, time) => {
+  let tween = new TWEEN.Tween(
+    {x: sprite.x, y: sprite.y})
+    .to({x: x, y: y},
+    time
+  );
+  tween.easing(TWEEN.Easing.Circular.Out);
+  tween.onUpdate(function() {
+    sprite.x = this.x;
+    sprite.y = this.y;
+  });
+  tween.start();
+  return tween;
+};
+
+export let fade = (sprite, alpha, time) => {
+  let tween = new TWEEN.Tween(
+    {alpha: sprite.alpha})
+    .to({alpha: alpha},
+    time
+  );
+  tween.easing(TWEEN.Easing.Linear.None);
+  tween.onUpdate(function() {
+    sprite.alpha = this.alpha;
+  });
+  tween.start();
+};

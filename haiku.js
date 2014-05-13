@@ -168,6 +168,42 @@ export function sound(source, volume = 1, pan = 0, loop = false, startPlaying = 
   return sound;
 }
 
+
+
+/*
+game
+----
+Haiku-mode convenience function for creating new Game object
+(You'll find it the `game.js` file so that it avoids a circular dependancy)
+
+export function game(width, height, setup, play, assets, load) {
+  let game = new Game({width, height, setup, play, assets, load});
+  game.start();
+  return game;
+}
+
+*/
+
+/*
+grid
+----
+Grid
+*/
+
+export function grid(
+    x = 0, y = 0, columns = 5, rows = 5,  
+    cellWidth = 32, cellHeight = 32, centerCell = false, 
+    makeSprite = undefined, 
+    extra = undefined
+  ) { 
+  return new Grid({
+    x, y, columns, rows,
+    cellWidth, cellHeight, centerCell, 
+    makeSprite, 
+    extra
+  });
+}
+
 /*
 hit
 ---
@@ -177,7 +213,6 @@ between rectangles, circles, and points.
 
 export function hit(a, b, react = false, bounce = false, extra = undefined) {
   let collision;
-
   //Check to make sure one of the arguments isn't an array
   if (a instanceof Sprite && b instanceof Array 
   || b instanceof Sprite && a instanceof Array) {
@@ -210,7 +245,7 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
       }
     }
     //They're not both sprites, so what are they?
-    //Does `a` have x and y properties?
+    //Is `a` not a sprite and does it have x and y properties?
     else if (a.x && a.y && b instanceof Sprite) {
       //Yes, so this is a point vs. sprite collision test
       return hitTestPoint(a, b);
@@ -229,7 +264,7 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
     //Loop through the array in reverse
     for (let i = b.length - 1; i >= 0; i--) {
       let sprite = b[i];
-      collision = findCollisionType(a, sprite); //spriteVsSprite(a, sprite);
+      collision = findCollisionType(a, sprite); 
       if (collision && extra) extra(collision, sprite);
     }
   }
@@ -283,94 +318,4 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
       }
     }
   }
-  /*
-  function spriteVsSprite(a, b) {
-    //Both objects are sprites, but what kind of sprites?
-
-    //Circles
-    if(a.diameter && b.diameter) {
-      //Should they react to the collision?
-      //No, they shouldn't react
-      if(!react) {
-        return hitTestCircle(a, b);
-      } 
-      //Yes, they should react
-      else {
-        //Are they both moving?
-        if (a.v.x + a.v.y !== 0 && b.v.x + b.v.y !== 0) {
-          //Yes, they are both moving
-          //(moving circle collisions always bounce apart so there's
-          //no need for the third, `bounce`, argument)
-          return movingCircleCollision(a, b);
-        }
-        else {
-          //No, they're not both moving
-          //Should they bounce apart?
-          //Yes
-          if(bounce) {
-            return circleCollision(a, b, false);
-          } 
-          //No
-          else {
-            return circleCollision(a, b, true); 
-          }
-        }
-      }
-    }
-
-    //Rectangles
-    if (!a.diameter && !b.diameter) {
-      //Should they react to the collision?
-      //No
-      if(!react) {
-        return hitTestRectangle(a, b);
-      } 
-      //Yes
-      else {
-        //Should they bounce apart?
-        //Yes
-        if(bounce) {
-          return rectangleCollision(a, b, true);
-        } 
-        //No
-        else {
-          return rectangleCollision(a, b, false); 
-        }
-      }
-    }
-  }
-  */
 }
-
-
-/*
-game
-----
-Zen-mode convenience function for creating new Game object
-(You'll find it the `game.js` file so that it avoids a circular dependancy)
-
-export function game(width, height, setup, play, assets, load) {
-  let game = new Game({width, height, setup, play, assets, load});
-  game.start();
-  return game;
-}
-
-*/
-
-/*
-grid
-----
-Grid
-*/
-
-export function grid(
-    x = 0, y = 0, width = 5, height = 5, 
-    cellWidth = 32, cellHeight = 32,centerCell = false, 
-    makeSprite = undefined, extra = undefined
-  ) { 
-  return new Grid({
-    p: {x, y}, width, height, cellWidth, cellHeight, centerCell, 
-    makeSprite, extra
-  });
-}
-

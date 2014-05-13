@@ -676,7 +676,13 @@ define a rectangular area
 
 */
 
-export function contain(s, x, y, width, height, bounce = false, extra = undefined) {
+export function contain(
+    s, x, y, width, height, 
+    bounce = false, extra = undefined
+  ){
+
+  //The `collision` object is used to store which 
+  //side of the containing rectangle the sprite hits
   let collision;
 
   //Left
@@ -704,7 +710,11 @@ export function contain(s, x, y, width, height, bounce = false, extra = undefine
     collision = "bottom";
   }
 
+  //The the `extra` function if there was a collision
+  //and `extra` has been defined
   if (collision && extra) extra(collision);
-
+  
+  //Return a the `collision` object   
   return collision;
 }
+

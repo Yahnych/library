@@ -62,6 +62,10 @@ export let groups = [];
 export class Group extends Array {
   constructor(...spritesToGroup) {
     if (spritesToGroup) {
+      //Loop through all the objects to group. If they're sprites,
+      //copy them into `this` Group object, which, of course, is
+      //an array. If they aren't sprites, throw an error to warn
+      //the user that they can only add Sprite objects to groups
       spritesToGroup.forEach((sprite) => {
         if (sprite instanceof Sprite) {
           this.push(sprite);
@@ -71,20 +75,21 @@ export class Group extends Array {
       });
     }
     //Add the group to the global array of groups
-    //(This is make it easier to add and remove sprites from a game)
+    //(This makes it easier to add and remove sprites from a game)
     groups.push(this);
+
+    //Private properties that will be accesses using getters/setters
+    this._layer = 0;
+    this._x = 0;
+    this._y = 0;
+    this._alpha = 1;
+    this._visible = true;
   }
   //Group getters and setters for some of the sprites' properties
   get x() {
-    if (this.length > 1) {
-      return this.reduce((a, b) => Math.min(a.p.x, b.p.x));
-    } else {
-      //If there's only one sprite in the array, get its value
-      return this[0].p.x;
-    }
+    return this._x;
   }
   set x(value) {
-    //find the group's current x position
     let currentX = this.x;
     this.forEach((sprite) => {
       //The offset is equal to the difference between the 
@@ -92,16 +97,13 @@ export class Group extends Array {
       let offset = value - currentX;
       sprite.p.x += offset;
     });
+    //Set the new x value
+    this._x = value;
   }
   get y() {
-    if (this.length > 1) {
-      return this.reduce((a, b) => Math.min(a.p.y, b.p.y));
-    } else {
-      return this[0].p.y;
-    }
+    return this._y;
   }
   set y(value) {
-    //find the group's current x position
     let currentY = this.y;
     this.forEach((sprite) => {
       //The offset is equal to the difference between the 
@@ -109,45 +111,34 @@ export class Group extends Array {
       let offset = value - currentY;
       sprite.p.y += offset;
     });
+    this._y = value;
   }
   get layer() {
-    if (this.length > 1) {
-      return this.reduce((a, b) => Math.min(a.layer, b.layer));
-    } else {
-      return this[0].layer;
-    }
+    return this._layer;
   }
   set layer(value) {
+    this._layer = value;
     this.forEach((sprite) => {
       sprite.layer = value;
     });
-    sprites.sort(byLayer);
   }
   get alpha() {
-    //The sprite with the heighest alpha value should represent the
-    //group's alpha value
-    if (this.length > 1) {
-      return this.reduce((a, b) => Math.max(a.alpha, b.alpha));
-    } else {
-      return this[0].alpha;
-    }
+    return this._alpha;
   }
   set alpha(value) {
     this.forEach((sprite) => sprite.alpha = value);
+    this._alpha = value;
   }
   get visible() {
-    if (this.length > 1) {
-      return this.some((sprite) => sprite.visible);
-    } else {
-      return this[0].visible;
-    }
+    return this._visible;
   }
   set visible(value) {
     this.forEach((sprite) => sprite.visible = value);
+    this._visible = value;
   }
   get empty() {
     //Use `empty` to check whether this group contains sprites
-    return(this.length > 0) ? false : true;
+    return (this.length > 0) ? false : true;
   }
   //Add and remove methods
   add(...spritesToAdd) {
@@ -161,7 +152,7 @@ export class Group extends Array {
   }
   ungroup(...spritesToRemove) {
     spritesToRemove.forEach((sprite) => {
-      let index = this.indexOf(sprite) 
+      let index = this.indexOf(sprite);
       if (index !== -1) {
         this.splice(this.indexOf(sprite), 1);
       } else {
@@ -169,21 +160,29 @@ export class Group extends Array {
       }
     });
   }
-  //A function that loops through all the sprites in the group
-  //(in reverse) and performs a user-definable action each sprite
-  loop(action) {
-    for (var i = this.length - 1; i >= 0; i--) {
-      let sprite = this[i];
-      if (action) action(sprite);
-    } 
-  }
 }
+
+/*
+remove
+-------
+
+A function to remove a sprite or group of sprites from a game.
+It removes the sprite from any groups that it belongs to,
+including the global `sprites` array.
+
+    remove(spriteName);
+
+You can remove a group of sprites like this:
+
+   remove(...spriteGroup);
+
+*/
 
 export function remove(...elementsToRemove) {
   elementsToRemove.forEach((element) => {
     //If the element is a Sprite...
     if (element instanceof Sprite) {
-      //Remove the sprite from any group arrays that it blongs to
+      //Remove the sprite from any group arrays that it belongs to
       groups.forEach((group) => {
         let index = group.indexOf(element);
         if (index !== -1) group.splice(index, 1);
@@ -192,7 +191,8 @@ export function remove(...elementsToRemove) {
     //Throw a warning error if the element isn't a Sprite
     else {
       throw new Error(
-        "You can only use the remove function to remove Sprites"
+        `You can only use the remove function to remove Sprites.
+        Remove a group of sprites like this: remove(...spriteGroup).`
       );
     }
   });
@@ -241,18 +241,25 @@ export class Sprite {
     this.alpha = 1;
     this.visible = true;
     //Line and color
-    this.strokeStyle = "black";
+    this.strokeStyle = "none";
     this.lineWidth = 1;
     this.fillStyle = "rgba(128; 128, 128, 1)";
     //Does this sprite scroll?
     this.scroll = true;
     //Which depth layer is the sprite on?
     //(Used with Groups in Chapter 5)
-    this.layer = 0;
+    this._layer = 0;
     //Copy the configuration properties onto the new object
     Object.assign(this, config);
     //Add this object to the `sprites` array
     sprites.push(this);
+  }
+  get layer() {
+    return this._layer;
+  }
+  set layer(value) {
+    this._layer = value;
+    sprites.sort(byLayer);
   }
   //Getters that return useful points on the sprite
   get halfWidth() {
@@ -455,7 +462,7 @@ An array to store all the buttons
 
 */
 
-export let buttons = [];
+export let buttons = new Group();
 
 /*
 Button
@@ -468,435 +475,68 @@ export class Button extends Tile {
     //buttons `state.up.x` and `state.up.y` values
     config.image.x = config.states.up.x;
     config.image.y = config.states.up.y;
+    //Assign the `press` and `release` methods to this object
     this.press = config.press;
     this.release = config.release;
+    //Run the super class's constructor to create the sprite
     super(config);
-    //The `_state` property tells you button's
-    //curent state
-    this._state = "up";
-    //this.alreadyPressed = false;
-    //this.alreadyReleased = false;
-    //Boolean state properties    
-    this.isUp = true;
-    this.isActive = false;
-    this.isDown = false;
-    //this.released = false;
-    //Methods that run when the button is pressed or released
-    //Push the button into the global `buttons` array.
-    buttons.push(this);
+    //The `state` property tells you button's
+    //curent state. Set its initial state to "up"
+    this.state = "up";
+    //`pressed` is a Boolean that helps track whether or not
+    //the button has been pressed down.
+    this.pressed = false;
+    //Add the button into the global `buttons` sprite group.
+    buttons.add(this);
   }
   update(pointer, canvas) {
-    //Up state
+    //1. Figure out the current state
     if (pointer.isUp) {
-      this.image.x = this.states.up.x;
-      this.image.y = this.states.up.y;
-      this._state = "up";
-      this.alreadyPressed = false;
-      //Change the mouse pointer back to an arrow
-      canvas.style.cursor = "auto";
+      //Up state
+      this.state = "up"
     }
     if (hitTestPoint(pointer.p, this)) {
       //Over state
-      this.image.x = this.states.over.x;
-      this.image.y = this.states.over.y;
-      //Change the mouse pointer to a hand
-      canvas.style.cursor = "pointer";
-      this._state = "over";
+      this.state = "over";
       //Down state
       if (pointer.isDown) {
-        this.image.x = this.states.down.x;
-        this.image.y = this.states.down.y;
-        this._state = "down";
-        //this.alreadyReleased = false;
+        this.state = "down"
       }
     }
 
-    //Set the button's Boolean properties
-    if (this.state === "over") {
-      if (this.isDown && this.release) this.release();
-      this.isDown = false;
-      this.isUp = true;
-      this.isActive = true;
-    }
+    //2. Set the correct image
+    this.image.x = this.states[this.state].x;
+    this.image.y = this.states[this.state].y;
+
+    //3. Run the correct button action
+    //a. Run the `press` method if the button state is "down" and
+    //the button hasn't already been pressed.
     if (this.state === "down") {
-      if (this.isUp && this.press) this.press();
-      this.isDown = true;
-      this.isUp = false;
-      this.isActive = true;
-      //this.released = false;
+      if (!this.pressed) { 
+        if (this.press) this.press();
+        this.pressed = true;
+      }
     }
+    //b. Run the `release` method if the button state is "over" and
+    //the button has been pressed.
+    if (this.state === "over") {
+      if (this.pressed) {
+        if (this.release) this.release();
+        this.pressed = false;
+      }
+    }
+    //c. Check to whether the pointer has been released outside
+    //the button's area. If the button state is "up" and it's
+    //already been pressed, then run the `release` method.
     if (this.state === "up") {
-      if (this.isDown && this.release) this.release();
-      this.isDown = false;
-      this.isUp = true;
-      this.isActive = false;
-    }
-  }
-  get state() {
-    return this._state;
-  }
-}
-
-/*
-export function glue(...spritesToGlue) {
-  spritesToGlue.forEach((sprite1) => {
-    spritesToGlue.forEach((sprite2) => {
-      if (sprite1 !== sprite2) {
-        startObserving(sprite1, sprite2);
+      if (this.pressed) {
+        if (this.release) this.release();
+        this.pressed = false;
       }
-    });
-  });
-  function startObserving(sprite1, sprite2) {
-    Object.observe(sprite1, (changes) => {
-      changes.forEach((change) => {
-        console.log(change.type, change.name, change.oldValue);
-        if (change.type === "update") {
-          let property = change.name,
-              value = change.object[change.name];
-          switch (change.name) {
-            case "layer":
-              if (sprite2[property] !== value
-                 || sprite2[property] === change.oldValue) {
-                sprite2.layer = value//sprite1.layer;
-                sprites.sort(byLayer);
-                console.log("layers sorted")
-              }
-              break;
-          }
-        }
-      });
-    });
+    }
   }
-}
-*/
-
-/*
-Group
------
-*/
-/*
-export class Group {
-  constructor(...spritesToGroup) {
-    this.sprites = [];
-    this.add(...spritesToGroup);
-    //Properties
-    this.x = 0;
-    this.y = 0;
-    this.visible = 0;
-    this.alpha = 0;
-    this.layer = 0;
-    //Start observing these properties
-    Object.observe(this, (changes) => {
-      changes.forEach((change) => {
-        console.log(change.type, change.name, change.oldValue);
-        if (change.type === "update") {
-          let property = change.name,
-              value = change.object[change.name];
-          switch (property) {
-            case "layer":
-              setProperties(property, value);
-              sprites.sort(byLayer);
-              console.log("layers sorted");
-              break;
-          }
-        }
-      });
-    });
-  }
-  setProperties(property, value) {
-    this.sprites.forEach((sprite) => {
-      sprite[property] = value;
-    });
-  }
-  react(changes) {
-  }
-  add(...spritesToAdd) {
-    spritesToAdd.forEach((sprite) => {
-      //Add the sprite to the group's array of sprites
-      this.sprites.push(sprite);
-      //Add a reference to the game object array on the 
-      //sprite itself so that we can remove it later
-      sprite.gameArrays.push(this.sprites);
-      //Set the sprite's layer value to this group's layer
-      sprite.layer = this._layer;
-    });
-    //Re-sort the global sprites array, by layer
-    sprites.sort(byLayer);
-    //Check to see if the adding the new sprite has
-    //changed the group's x/y position
-    //this.updatePosition();
-  }
-  remove(...spritesToRemove) {
-    spritesToRemove.forEach((sprite) => {
-      this.sprites.splice(this.sprites.indexOf(sprite), 1);
-      //Remove the sprite's own reference to the groups array of
-      //sprites from its `gameArrays` property
-      if (sprite.gameArrays.indexOf(this.sprites !== -1)) {
-        sprite.gameArrays.splice(this.sprites, 1);
-      }
-    });
-    //Check to see if the removing the new sprite has
-    //changed the group's x/y position
-    //this.updatePosition();
-  }
-}
-*/
-/*
-export function glue(...spritesToGroup) {
-  let array = [];
-  spritesToGroup.forEach((sprite) => {
-    addSprite(sprite, array);
-  });
-  //Get x and y
-  array.getX = () => {
-    return array.reduce((a, b) => Math.min(a.p.x, b.p.x));
-  }; 
-  array.getY = () => {
-    return array.reduce((a, b) => Math.min(a.p.y, b.p.y));
-  }; 
-  //Set x and y
-  array.setX = (value) => {
-    //find the group's current x position
-    let currentX = array.getX();
-    array.forEach((sprite) => {
-      //The offset is equal to the difference between the 
-      //group's `currentX` position and its new `value`
-      let offset = value - currentX;
-      sprite.p.x += offset;
-    });
-  }; 
-  array.setY = (value) => {
-    let currentY = array.getY();
-    array.forEach((sprite) => {
-      let offset = value - currentY;
-      sprite.p.y += offset;
-    });
-  }; 
-  //Get and set the depth layer
-  array.getLayer = () => {
-    return array.reduce((a, b) => Math.min(a.layer, b.layer));
-  };
-  array.setLayer = (value) => {
-    array.forEach((sprite) => {
-      sprite.layer = value;
-    });
-    sprites.sort(byLayer);
-  };
-  //Get and set the alpha
-  array.getAlpha = () => {
-    //The sprite with the heighest alpha value should represent the
-    //group's alpha value
-    return array.reduce((a, b) => Math.max(a.alpha, b.alpha));
-  };
-  array.setAlpha = (value) => {
-    array.forEach((sprite) => sprite.alpha = value);
-  };
-  //Get and set the visibility
-  array.getVisible = () => {
-    return array.some((sprite) => sprite.visible);
-  };
-  array.setVisible = (value) => {
-    array.forEach((sprite) => sprite.visible = value);
-  };
-
-
-  return array;
 }
 
-export function unglue(groupArray) {
-  spritesToUngroup.forEach((sprite) => {
-    removeSprite(sprite, groupArray);
-  });
-}
-
-export function set(group, property, value) {
-  group.forEach((sprite) => {
-    sprite[property] = value;
-  });
-  if (property === "layer") sprites.sort(byLayer);
-}
-
-export function offset(group, property, value) {
-  group.forEach((sprite) => {
-    sprite[property] += value;
-  });
-}
-*/
-/*
-export class Group {
-  constructor(...spritesToGroup) {
-    this.sprites = [];
-    //Internal alpha and visible properites. They're accessed by
-    //getters/setters in the code ahead
-    this._alpha = 1;
-    this._visible = true;
-    this._layer = 0;
-    //The group's position
-    this.current = {x: 0, y: 0};
-    this.previous = {x: 0, y: 0};
-    //Add the sprites to the group
-    spritesToGroup.forEach((sprite) => {
-      this.add(sprite);
-    });
-    //Sort the global sprites array by layer
-    if(this.sprites.length > 0) {
-      sprites.sort(byLayer);
-    }
-  }
-  findX() {
-    //Find the x position of the sprite furthest to the left
-    let smallest;
-    this.sprites.forEach((sprite) => {
-      if (sprite.p.x < smallest || smallest === undefined) {
-        smallest = sprite.p.x;
-      }
-    });
-    return smallest;
-  }
-  findY() {
-    //Find the y position of the sprite furthest to the left
-    let smallest;
-    this.sprites.forEach((sprite) => {
-      if (sprite.p.y < smallest || smallest === undefined) {
-        smallest = sprite.p.y;
-      }
-    });
-    return smallest;
-  }
-  get x() {
-    return this.current.x;
-  }
-  set x(value) {
-    this.current.x = value;
-    //Loop through all the sprites in the group
-    //and figure out by how much to offset the
-    //each sprite's x position from the group's x position
-    this.sprites.forEach((sprite) => {
-      //The offset is equal to the difference between the 
-      //group's `current.x` position and its `previous.x` position
-      let offset = this.current.x - this.previous.x;
-      sprite.p.x += offset;
-    });
-    //Store the group's `current.x` position as it's `previous.x`
-    //position so that we can use it to calculate the next offset
-    this.previous.x = this.current.x;
-  }
-  get y() {
-    return this.current.y;
-  }
-  set y(value) {
-    //Caluclate the y offset for all the sprites in the group
-    this.current.y = value;
-    this.sprites.forEach((sprite) => {
-      let offset = this.current.y - this.previous.y;
-      sprite.p.y += offset;
-    });
-    this.previous.y = this.current.y;
-  }
-  get visible() {
-    return this._visible;
-  }
-  set visible(value) {
-    this._alpha = value;
-    for (let sprite of this.sprites) sprite.visible = value;
-  }
-  get alpha() {
-    return this._alpha;
-  }
-  set alpha(value) {
-    this._alpha = value;
-    for (let sprite of this.sprites) sprite.alpha = value;
-  }
-  get empty() {
-    //Use `empty` to check whether this group contains sprites
-    if (this.sprites.length > 0) {
-      return false;
-    } else {
-      return true;
-    }
-  }
-  get layer() {
-    return this._layer;
-  }
-  set layer(value) {
-    this._layer = value;
-    this.sprites.forEach((sprite) => {
-      sprite.layer = value;
-    });
-    sprites.sort(byLayer);
-  }
-  fadeOut(speed = 0.01) {
-    this.alpha -= speed;
-    if (this.alpha < 0) {
-      this.alpha = 0;
-      this.fadingOut = false;
-    }
-  }
-  fadeIn(speed = 0.01) {
-    this.alpha += speed;
-    if (this.alpha > 1) {
-      this.alpha = 1;
-      this.fadingIn = false;
-    }
-  }
-  ease(x, y, speed = 0.1) {
-    let distance, v = {};
-    //Figure out the distance between the sprites
-    v.x = x - this.x;
-    v.y = y - this.y;
-    distance = Math.sqrt(v.x * v.x + v.y * v.y);
-    //Move the group if it's more than 1 pixel away from the
-    //destination
-    if (distance >= 1) {
-      this.x += v.x * speed;
-      this.y += v.y * speed;
-    }
-  }
-  add(...spritesToAdd) {
-    spritesToAdd.forEach((sprite) =>{
-      //Add the sprite to the group's array of sprites
-      this.sprites.push(sprite);
-      //Add a reference to the game object array on the 
-      //sprite itself so that we can remove it later
-      sprite.gameArrays.push(this.sprites);
-      //Set the sprite's layer value to this group's layer
-      sprite.layer = this._layer;
-    });
-    //Re-sort the global sprites array, by layer
-    sprites.sort(byLayer);
-    //Check to see if the adding the new sprite has
-    //changed the group's x/y position
-    this.updatePosition();
-  }
-  remove(...spritesToRemove) {
-    spritesToRemove.forEach((sprite) => {
-      this.sprites.splice(this.sprites.indexOf(sprite), 1);
-      //Remove the sprite's own reference to the groups array of
-      //sprites from its `gameArrays` property
-      if (sprite.gameArrays.indexOf(this.sprites !== -1)) {
-        sprite.gameArrays.splice(this.sprites, 1);
-      }
-    });
-    //Check to see if the removing the new sprite has
-    //changed the group's x/y position
-    this.updatePosition();
-  }
-  updatePosition() {
-    //Find out if adding or removing a sprite from the group has
-    //changed the group's x/y position
-    let temporary = {x: this.current.x, y: this.current.y};
-    //Use `findX` and `findY` to figure our the group's
-    //top left corner position based on the sprites
-    this.current = {x: this.findX(), y: this.findY()};
-    if (temporary.x !== this.current.x) {
-      this.previous.x = this.current.x;
-    }
-    if (temporary.y !== this.current.y) {
-      this.previous.y = this.current.y;
-    }
-  }
-}
-*/
 /*
 Grid
 ----
@@ -904,41 +544,50 @@ Grid
 
 export class Grid extends Group {
   constructor(config) {
-    this.p = {x: 0, y: 0};
-    this.width = 5;
-    this.height = 5;
+    this.colums = 5;
+    this.rows = 5;
     this.cellWidth = 64;
     this.cellHeight = 64;
     this.centerCell = false;
+    //A temporary array to hold the sprites that are going to 
+    //be created.
     this.gridSprites = [];
-    //An extra function that will run after each new
-    //grid cell is created
-    this.extra = (sprite) => {};
-    //Assign the config object to the grid
-    Object.assign(this, config);
-    //A default `makeSprite` method if one hasn't been provided
+    //Assign the config object to the grid, but make sure
+    //not to assign the `x` and `y` properties. This is to
+    //prevent them from overwriting the `x` and `y` getters
+    //and setters in the parent `Group` class
+    Object.keys(config).forEach((key) => {
+       if (key !== "x" && key !== "y") {
+         this[key] = config[key];
+       }
+    });
+    //Throw an error if you forgot to supply the `makeSprite` method
     if (!this.makeSprite) {
-      this.makeSprite = () => { 
-        return new Rectangle({
-          width: this.cellWidth,
-          height: this.cellHeight
-        });
-      };
+      throw new Error("Please provide a makeSprite method");
     }
     //Create the grid
     this.create();
-    //Add the sprites in the grid to a group
+    //Initialize the `Group` superclass with the 
+    //array of `gridSprites` that the `create` method made
     super(...this.gridSprites);
-    //Clear the temporary array
+    //console.log(`test ${this[2].p.x}`)
+    //Position the grid using `config.x` and `config.y` values
+    this.x = config.x;
+    this.y = config.y;
+    //Clear the `gridSprites` array
     this.gridSprites = [];
   }
   create() {
-    let length = this.height * this.width;
+    let length = this.columns * this.rows;
     for(let i = 0; i < length; i++) {
-      let x = ((i % this.width) * this.cellWidth) + this.p.x,
-          y = (Math.floor(i / this.width) * this.cellWidth) + this.p.y;
-      
+      let x = ((i % this.columns) * this.cellWidth),
+          y = (Math.floor(i / this.columns) * this.cellWidth);
+     
+      //Use the `makeSpite` method supplied in the constructor
+      //to make the a sprite for the grid cell
       let sprite = this.makeSprite();
+
+      //Should the sprite be centered in the cell?
       if (!this.centerCell) {
         sprite.p.x = x;
         sprite.p.y = y;
@@ -948,10 +597,11 @@ export class Grid extends Group {
         sprite.p.y = y + sprite.height / 2;
       }
 
-      //Run any optional extra code
+      //Run any optional extra code. This calls the
+      //`extra` method supplied by the constructor
       if (this.extra) this.extra(sprite);
       
-      //Add the block to the group's temporary `gridSprites` array
+      //Add the sprite to the `gridSprites` array
       this.gridSprites.push(sprite);
     }
   }
@@ -963,12 +613,13 @@ sort functions
 */
 
 export function byLayer(a, b) {
+  //return a.layer - b.layer;
   if (a.layer < b.layer) {
     return -1;
   } else if (a.layer > b.layer) {
     return 1;
   } else {
-    return 0;
+    return 1;
   }
 }
 
@@ -1111,76 +762,6 @@ export function render(canvas) {
 }
 
 /*
-addSprite
-------------
-
-A function that adds sprite to arrays in a game 
-
-    addSprite(spriteName, enemyArray);
-
-The second argument is an array that you want to add the sprite into
-You can add as many of these arrays as you like.
-
-*/
-
-export function addSprite(sprite, ...arrays) {
-  //Add the sprite to any game arrays that it might be in
-  if(arrays.length !== 0) {
-    arrays.forEach((array) => {
-      //Push the sprite into the game object array
-      array.push(sprite);
-      //Add a reference to the game object array on the 
-      //sprite itself so that we can remove it later
-      sprite.gameArrays.push(array);
-    });
-  }
-}
-
-/*
-removeSprite
-------------
-
-A function that removes a sprite from the `sprites` array
-an also from any other arrays that it might in
-
-    removeSprite(spriteName, enemyArray);
-
-The second argument is an array that the sprite might belong to in the game.
-You can add as of these arrays as you like. However, they're optional. If you
-leave them out, all the sprite will be removed from all the game
-arrays that it's in.
-
-*/
-
-export function removeSprite(sprite, ...arrays) {
-  //Remove the sprite from any game arrays that it might be in
-  if (arrays.length !== 0) {
-    arrays.forEach((array) => {
-      array.splice(array.indexOf(sprite), 1);
-      //Remove the sprite's own reference to the array
-      //from its `gameArrays` property
-      if (sprite.gameArrays.indexOf(array !== -1)) {
-        sprite.gameArrays.splice(array, 1);
-      }
-    });
-  }
-  //If an array isn't specified, remove the sprite's own references
-  //to any arrays in the game that it might be in
-  else  if (sprite.gameArrays.length !== 0) {
-    //Loop through all the arrays that might be referenced in the
-    //sprite's `gameArrays` list
-    sprite.gameArrays.forEach((array) => {
-      //Remove the sprite from the array
-      array.splice(array.indexOf(sprite), 1);
-      //Remove the array from the sprite's list of game arrays
-      sprite.gameArrays.splice(sprite.gameArrays.indexOf(array), 1);
-    });
-  }
-  //Remove the sprite from the `sprites` array
-  sprites.splice(sprites.indexOf(sprite), 1);
-}
-
-/*
 shoot
 -----
 
@@ -1250,6 +831,27 @@ export function shoot(config) {
 }
 
 /*
+removeSprite
+-------------
+
+A function to remove a sprite from any arrays it might be in,
+as well as the global `sprites` array.
+
+*/
+
+export function removeSprite(sprite, ...arrays) {
+  //Remove the sprite from any game arrays that it might be in
+  if(arrays) {
+    arrays.forEach((array) => {
+      array.splice(array.indexOf(sprite), 1);
+    });
+  }
+  //Remove the sprite from the `sprites` array
+  sprites.splice(sprites.indexOf(sprite), 1);
+}
+
+
+/*
 progressBar
 -------------
 
@@ -1266,53 +868,59 @@ export let progressBar = {
   assets: null,
   initialized: false,
   create(canvas, assets) {
-    //Store a reference to the `assets` object
-    this.assets = assets;
-    //Set the maximum width to half the width of the canvas
-    this.maxWidth = canvas.width / 2;
+    if (!this.initialized) {
+      //Store a reference to the `assets` object
+      this.assets = assets;
+      //Set the maximum width to half the width of the canvas
+      this.maxWidth = canvas.width / 2;
 
-    //Build the progress bar using two Rectangle sprites and
-    //one Message Sprite
-    //1. Create the bar's gray background
-    this.backBar = new Rectangle({
-      p: {
-        x: (canvas.width / 2) - (this.maxWidth / 2),
-        y: (canvas.height / 2) - 16
-      },
-      width: this.maxWidth, height: 32,
-      fillStyle: this.backgroundColor,
-      strokeStyle: "none"
-    });
-    //2. Create the blue foreground. This is the element of the 
-    //progress bar that will increase in width as assets load
-    this.frontBar = new Rectangle({
-      p: {
-        x: (canvas.width / 2) - (this.maxWidth / 2),
-        y: (canvas.height / 2) - 16
-      },
-      width: 0, height: 32,
-      fillStyle: this.foregroundColor,
-      strokeStyle: "none"
-    });
-    //3. A Message sprite that will display the percentage
-    //of assets that have loaded
-    this.percentage = new Message({
-      p: {
-        x: (canvas.width / 2) - (this.maxWidth / 2) + 12,
-        y: (canvas.height / 2) - 16
-      },
-      font: "28px sans-serif",
-      text: "0%"
-    });
-    //Flag the progressBar as having been initialized
-    this.initialized = true;
+      //Build the progress bar using two Rectangle sprites and
+      //one Message Sprite
+      //1. Create the bar's gray background
+      this.backBar = new Rectangle({
+        p: {
+          //Center it inside the canvas
+          x: (canvas.width / 2) - (this.maxWidth / 2),
+          y: (canvas.height / 2) - 16
+        },
+        width: this.maxWidth, height: 32,
+        fillStyle: this.backgroundColor,
+        strokeStyle: "none"
+      });
+      //2. Create the blue foreground. This is the element of the 
+      //progress bar that will increase in width as assets load
+      this.frontBar = new Rectangle({
+        p: {
+          //Center it inside the canvas
+          x: (canvas.width / 2) - (this.maxWidth / 2),
+          y: (canvas.height / 2) - 16
+        },
+        width: 0, height: 32,
+        fillStyle: this.foregroundColor,
+        strokeStyle: "none"
+      });
+      //3. A Message sprite that will display the percentage
+      //of assets that have loaded
+      this.percentage = new Message({
+        p: {
+          x: (canvas.width / 2) - (this.maxWidth / 2) + 12,
+          y: (canvas.height / 2) - 16
+        },
+        font: "28px sans-serif",
+        text: "0%"
+      });
+      //Flag the progressBar as having been initialized
+      this.initialized = true;
+    }
   },
   update() {
     //Change the width of the blue `frontBar` to match the 
     //ratio of assets that have loaded
-    this.frontBar.width = (this.maxWidth / this.assets.toLoad) * this.assets.loaded;
+    this.frontBar.width = 
+      (this.maxWidth / this.assets.toLoad) * this.assets.loaded;
     //Display the percentage
-    this.percentage.text = `${(this.assets.loaded / this.assets.toLoad) * 100}%`;
+    this.percentage.text = 
+      `${(this.assets.loaded / this.assets.toLoad) * 100}%`;
   },
   remove() {
     //Remove the progress bar
