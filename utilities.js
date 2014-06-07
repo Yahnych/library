@@ -180,6 +180,10 @@ export let assets = {
   //like this: `assets.whenLoaded = makeSprites;`
   whenLoaded: undefined,
 
+  //If Pixi is being used as the renderer, use Pixi's
+  //ImageLoader to add the image to the texture cache
+  pixi: true,
+
   //The load method creates and loads all the assets. Use it like this:
   //`assets.load(["images/anyImage.png", "fonts/anyFont.otf"]);`
   load(sources) {
@@ -210,17 +214,39 @@ export let assets = {
         //Load images that have file extensions that match. 
         //the imageExtensions array
         if (this.imageExtensions.indexOf(extension) !== -1) {
-          //Create a new image and add a loadHandler
-          let image = new Image();
-          //image.addEventListener("load", this.loadHandler.bind(this), false);
-          image.addEventListener("load", loadHandler.bind(this), false);
-          //Get the image file name
-          image.name = source.split("/").pop();
-          //Assign the image as a property of the assets object so
-          //we can access it like this: `assets["imageName.png"]`
-          this[image.name] = image;
-          //Set the image's src property so we can start loading the image
-          image.src = source;
+
+          //If you're using Pixi, Pixi's `ImageLoader` adds the
+          //image to the texture cache. The asset name will be a
+          //string that references the correct texture in the cache
+          if(this.pixi && PIXI) {
+            let loader = new PIXI.ImageLoader(source);
+            loader.onLoaded = () => { 
+              //Get the file name from the full source path
+              let name = source.split("/").pop();
+              //Use the file name to reference the correct texture
+              this[name] = PIXI.TextureCache[source];
+              //Alert the load handler that the image has loaded
+              //and the texture has been cached
+              loadHandler();
+            };
+            //Start loading
+            loader.load();
+
+          //If you're not using Pixi, load an image. The asset name
+          //will be an ordinary JavaScript image object
+          } else {
+            //Create a new image and add a loadHandler
+            let image = new Image();
+            //image.addEventListener("load", this.loadHandler.bind(this), false);
+            image.addEventListener("load", loadHandler.bind(this), false);
+            //Get the image file name
+            image.name = source.split("/").pop();
+            //Assign the image as a property of the assets object so
+            //we can access it like this: `assets["imageName.png"]`
+            this[image.name] = image;
+            //Set the image's src property so we can start loading the image
+            image.src = source;
+          }
         }
 
         //Load fonts that have file extensions that match 
@@ -239,30 +265,56 @@ export let assets = {
         //Load json files that have file extensions that match 
         //the jsonExtensions array 
         else if (this.jsonExtensions.indexOf(extension) !== -1) {
-          //Create a new xhr object and an object to store the file
-          let xhr = new XMLHttpRequest();
-          let file = {};
-          //Use xhr to load the JSON file
-          xhr.open("GET", source, true);
-          xhr.addEventListener("readystatechange", () => {
-            //Check to make sure the file has loaded properly
-            if (xhr.status === 200 && xhr.readyState === 4) {
-              //Convert the JSON data file into an ordinary object
-              file = JSON.parse(xhr.responseText);
+          //If Pixi is being used, then load the JSON file with Pixi's
+          //`JsonLoader`. It will parse Texture Packer and Spine data
+          if (this.pixi && PIXI) {
+            let loader = new PIXI.JsonLoader(source);
+            loader.onLoaded = () => { 
+              //Get access to the parsed JSON object
+              let file = loader.json;
               //Get the file name
               file.name = source.split("/").pop();
               //Assign the file as a property of the assets object so
               //we can access it like this: `assets["file.json"]`
               this[file.name] = file;
-              //console.log("JSON data loaded");
-              //console.log(file);
-              //console.log(file.name);
+              
+              //Copy a reference of each image on the tileset into
+              //this `assets` object. That means you'll be able to 
+              //access each image like this: `assets["imageName"]`
+              Object.keys(file.frames).forEach((frame) => {
+                this[frame] = PIXI.TextureCache[frame];
+              });
+
               //Alert the load handler that the file has loaded
               loadHandler();
-            }
-          });
-          //Send the request to load the file
-          xhr.send();
+            };
+            loader.load();
+          }
+          
+          //If Pixi isn't being used, load the JSON file as usual 
+          else {
+            //Create a new xhr object and an object to store the file
+            let xhr = new XMLHttpRequest();
+            let file = {};
+            //Use xhr to load the JSON file
+            xhr.open("GET", source, true);
+            xhr.addEventListener("readystatechange", () => {
+              //Check to make sure the file has loaded properly
+              if (xhr.status === 200 && xhr.readyState === 4) {
+                //Convert the JSON data file into an ordinary object
+                file = JSON.parse(xhr.responseText);
+                //Get the file name
+                file.name = source.split("/").pop();
+                //Assign the file as a property of the assets object so
+                //we can access it like this: `assets["file.json"]`
+                this[file.name] = file;
+                //Alert the load handler that the file has loaded
+                loadHandler();
+              }
+            });
+            //Send the request to load the file
+            xhr.send();
+          }
         }
 
         //Load audio files that have file extensions that match 
