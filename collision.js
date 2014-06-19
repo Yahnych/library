@@ -61,10 +61,10 @@ export function hitTestPoint(point, sprite) {
   //Rectangle
   if (shape === "rectangle") {
     //Get the postion of the sprite's edges
-    left = sprite.p.x;
-    right = sprite.p.x + sprite.width;
-    top = sprite.p.y;
-    bottom = sprite.p.y + sprite.height;
+    left = sprite.x;
+    right = sprite.x + sprite.width;
+    top = sprite.y;
+    bottom = sprite.y + sprite.height;
 
     //Find out if the point is intersecting the rectangle
     hit = point.x > left && point.x < right && point.y > top && point.y < bottom;
@@ -78,7 +78,7 @@ export function hitTestPoint(point, sprite) {
       x: point.x - sprite.center.x,
       y: point.y - sprite.center.y
     }
-    magnitude = Math.sqrt(v.x * v.x + v.y * v.y);
+    magnitude = Math.sqrt(vx * vx + v.y * v.y);
 
     //The point is intersecting the circle if the magnitude
     //(distance) is less than the circle's radius
@@ -169,8 +169,8 @@ export function circleCollision(c1, c2, bounce = true) {
     //Move circle 1 out of the collision by multiplying
     //the overlap with the normalized vector and subtract it from 
     //circle 1's position
-    c1.p.x -= overlap * d.x;
-    c1.p.y -= overlap * d.y;
+    c1.x -= overlap * d.x;
+    c1.y -= overlap * d.y;
 
     //Bounce    
     if (bounce) {
@@ -185,8 +185,8 @@ export function circleCollision(c1, c2, bounce = true) {
     } else {
       //Make it a bit slippery
       let friction = 0.9;
-      c1.v.x *= friction;
-      c1.v.y *= friction;
+      c1.vx *= friction;
+      c1.vy *= friction;
     }
   }
 
@@ -249,18 +249,18 @@ export function movingCircleCollision(c1, c2) {
     s.v.yHalf = Math.abs(s.d.y * overlap / 2);
 
     //Find the side that the collision if occuring on
-    (c1.p.x > c2.p.x) ? xSide = 1 : xSide = -1;
-    (c1.p.y > c2.p.y) ? ySide = 1 : ySide = -1;
+    (c1.x > c2.x) ? xSide = 1 : xSide = -1;
+    (c1.y > c2.y) ? ySide = 1 : ySide = -1;
 
     //Move c1 out of the collision by multiplying
     //the overlap with the normalized vector and adding it to 
     //the circle's positions
-    c1.p.x = c1.p.x + (s.v.xHalf * xSide);
-    c1.p.y = c1.p.y + (s.v.yHalf * ySide);
+    c1.x = c1.x + (s.v.xHalf * xSide);
+    c1.y = c1.y + (s.v.yHalf * ySide);
 
     //Move c2 out of the collision
-    c2.p.x = c2.p.x + (s.v.xHalf * -xSide);
-    c2.p.y = c2.p.y + (s.v.yHalf * -ySide);
+    c2.x = c2.x + (s.v.xHalf * -xSide);
+    c2.y = c2.y + (s.v.yHalf * -ySide);
 
     //1. Calculate the collision surface's properties
 
@@ -271,14 +271,14 @@ export function movingCircleCollision(c1, c2) {
     //2. Bounce c1 off the surface (s)
 
     //Find the dot product between c1 and the surface
-    let dp1 = c1.v.x * s.d.x + c1.v.y * s.d.y;
+    let dp1 = c1.vx * s.d.x + c1.vy * s.d.y;
 
     //Project c1's velocity onto the collision surface
     p1A.x = dp1 * s.d.x;
     p1A.y = dp1 * s.d.y;
 
     //Find the dot product of c1 and the surface's left normal (s.l.x and s.l.y)
-    let dp2 = c1.v.x * (s.l.x / s.magnitude) + c1.v.y * (s.l.y / s.magnitude);
+    let dp2 = c1.vx * (s.l.x / s.magnitude) + c1.vy * (s.l.y / s.magnitude);
 
     //Project the c1's velocity onto the surface's left normal
     p1B.x = dp2 * (s.l.x / s.magnitude);
@@ -287,14 +287,14 @@ export function movingCircleCollision(c1, c2) {
     //3. Bounce c2 off the surface (s)
 
     //Find the dot product between c2 and the surface
-    let dp3 = c2.v.x * s.d.x + c2.v.y * s.d.y;
+    let dp3 = c2.vx * s.d.x + c2.vy * s.d.y;
 
     //Project c2's velocity onto the collision surface
     p2A.x = dp3 * s.d.x;
     p2A.y = dp3 * s.d.y;
 
     //Find the dot product of c2 and the surface's left normal (s.l.x and s.l.y)
-    let dp4 = c2.v.x * (s.l.x / s.magnitude) + c2.v.y * (s.l.y / s.magnitude);
+    let dp4 = c2.vx * (s.l.x / s.magnitude) + c2.vy * (s.l.y / s.magnitude);
 
     //Project c2's velocity onto the surface's left normal
     p2B.x = dp4 * (s.l.x / s.magnitude);
@@ -315,10 +315,10 @@ export function movingCircleCollision(c1, c2) {
 
     //Add the bounce vector to the circles' velocity
     //and add mass if the circle has a mass property
-    c1.v.x = c1.bounce.x / c1.mass;
-    c1.v.y = c1.bounce.y / c1.mass;
-    c2.v.x = c2.bounce.x / c2.mass;
-    c2.v.y = c2.bounce.y / c2.mass;
+    c1.vx = c1.bounce.x / c1.mass;
+    c1.vy = c1.bounce.y / c1.mass;
+    c2.vx = c2.bounce.x / c2.mass;
+    c2.vy = c2.bounce.y / c2.mass;
   }
   return hit;
 }
@@ -372,8 +372,8 @@ rectangleCollision
 Use it to prevent two rectangular sprites from overlapping. 
 Optionally, make the first retangle bounceoff the second rectangle.
 Parameters: 
-a. A sprite object with `p.x`, `p.y` `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
-b. A sprite object with `p.x`, `p.y` `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
+a. A sprite object with `x`, `y` `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
+b. A sprite object with `x`, `y` `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
 c. Optional: true or false to indicate whether or not the first sprite
 should bounce off the second sprite.
 */
@@ -388,9 +388,11 @@ export function rectangleCollision(r1, r2, bounce = false) {
   let collision;
 
   //Calculate the distance vector
-  v.x = r1.center.x - r2.center.x;
-  v.y = r1.center.y - r2.center.y;
-
+  //v.x = r1.center.x - r2.center.x;
+  //v.y = r1.center.y - r2.center.y;
+  v.x = r1.centerX - r2.centerX;
+  v.y = r1.centerY - r2.centerY;
+  
   //Figure out the combined half-widths and half-heights
   combinedHalfWidths = r1.halfWidth + r2.halfWidth;
   combinedHalfHeights = r1.halfHeight + r2.halfHeight;
@@ -414,24 +416,21 @@ export function rectangleCollision(r1, r2, bounce = false) {
         //But on which side? vy can tell us
         if (v.y > 0) {
           collision = "top";
-
           //Move the rectangle out of the collision
-          r1.p.y = r1.p.y + overlap.y;
+          r1.y = r1.y + overlap.y;
         } else {
           collision = "bottom";
-
           //Move the rectangle out of the collision
-          r1.p.y = r1.p.y - overlap.y;
+          r1.y = r1.y - overlap.y;
         }
-
         //Bounce
         if (bounce) {
-          r1.v.y *= -1;
+          r1.vy *= -1;
 
           /*Alternative
           //Find the bounce surface's vx and vy properties
           let s = {v:{}};
-          s.v.x = r2.p.x - r2.p.x + r2.width; 
+          s.v.x = r2.x - r2.x + r2.width; 
           s.v.y = 0;
 	
           //Bounce r1 off the surface
@@ -443,25 +442,22 @@ export function rectangleCollision(r1, r2, bounce = false) {
         //But on which side? vx can tell us
         if (v.x > 0) {
           collision = "left";
-
           //Move the rectangle out of the collision
-          r1.p.x = r1.p.x + overlap.x;
+          r1.x = r1.x + overlap.x;
         } else {
           collision = "right";
-
           //Move the rectangle out of the collision
-          r1.p.x = r1.p.x - overlap.x;
+          r1.x = r1.x - overlap.x;
         }
-
         //Bounce
         if (bounce) {
-          r1.v.x *= -1;
+          r1.vx *= -1;
 
           /*Alternative
           //Find the bounce surface's vx and vy properties
           let s = {v:{}};
           s.v.x = 0; 
-          s.v.y = r2.p.y - r2.p.y + r2.height;
+          s.v.y = r2.y - r2.y + r2.height;
 		
           //Bounce r1 off the surface
           bounceOffSurface(r1, s);
@@ -520,14 +516,14 @@ function bounceOffSurface(o, s) {
   //2. Bounce the object (o) off the surface (s)
 
   //Find the dot product between the object and the surface
-  dp1 = o.v.x * s.d.x + o.v.y * s.d.y;
+  dp1 = o.vx * s.d.x + o.vy * s.d.y;
 
   //Project the object's velocity onto the collision surface
   p1.v.x = dp1 * s.d.x;
   p1.v.y = dp1 * s.d.y;
 
   //Find the dot product of the object and the surface's left normal (s.l.x and s.l.y)
-  dp2 = o.v.x * (s.l.x / s.magnitude) + o.v.y * (s.l.y / s.magnitude);
+  dp2 = o.vx * (s.l.x / s.magnitude) + o.vy * (s.l.y / s.magnitude);
 
   //Project the object's velocity onto the surface's left normal
   p2.v.x = dp2 * (s.l.x / s.magnitude);
@@ -543,8 +539,8 @@ function bounceOffSurface(o, s) {
 
   //Assign the bounce vector to the object's velocity
   //with optional mass to dampen the effect
-  o.v.x = bounce.x / mass;
-  o.v.y = bounce.y / mass;
+  o.vx = bounce.x / mass;
+  o.vy = bounce.y / mass;
 }
 
 /*
@@ -686,27 +682,27 @@ export function contain(
   let collision;
 
   //Left
-  if (s.p.x < x) {
-    if (bounce) s.v.x *= -1;
-    s.p.x = x;
+  if (s.x < x) {
+    if (bounce) s.vx *= -1;
+    s.x = x;
     collision = "left";
   }
   //Top
-  if (s.p.y < y) {
-    if (bounce) s.v.y *= -1;
-    s.p.y = y;
+  if (s.y < y) {
+    if (bounce) s.vy *= -1;
+    s.y = y;
     collision = "top";
   }
   //Right
-  if (s.p.x + s.width > width) {
-    if (bounce) s.v.x *= -1;
-    s.p.x = width - s.width;
+  if (s.x + s.width > width) {
+    if (bounce) s.vx *= -1;
+    s.x = width - s.width;
     collision = "right";
   }
   //Bottom
-  if (s.p.y + s.height > height) {
-    if (bounce) s.v.y *= -1;
-    s.p.y = height - s.height;
+  if (s.y + s.height > height) {
+    if (bounce) s.vy *= -1;
+    s.y = height - s.height;
     collision = "bottom";
   }
 
@@ -718,3 +714,126 @@ export function contain(
   return collision;
 }
 
+/*
+hit
+---
+A convenient universal collision function to test for collisions
+between rectangles, circles, and points.
+*/
+
+export function hit(a, b, react = false, bounce = false, extra = undefined) {
+  let collision;
+  let aIsASprite = a instanceof PIXI.DisplayObject; // || a instanceof Sprite;
+  let bIsASprite = b instanceof PIXI.DisplayObject; // || a instanceof Sprite;
+
+  //Check to make sure one of the arguments isn't an array
+  if (aIsASprite && b instanceof Array 
+  || bIsASprite  && a instanceof Array) {
+    //If it is, check for a collision between a sprite and an array
+    spriteVsArray();
+  } else {
+    //If one of the arguments isn't an array, find out what type of
+    //collision check to run
+    collision = findCollisionType(a, b); 
+    if (collision && extra) extra(collision);
+  }
+  
+  //Return the result of the collision.
+  //It will be `undefined` if there's no collision and `true` if 
+  //there is a collision. `rectangleCollision` sets `collsision` to
+  //"top", "bottom", "left" or "right" depeneding on which side the
+  //collision is occuring on
+  return collision;
+
+  function findCollisionType (a, b) {
+    //Are `a` and `b` both sprites?
+    //(We have to check again if this function was called from
+    //`spriteVsArray`)
+    let aIsASprite = a instanceof PIXI.DisplayObject; // || a instanceof Sprite;
+    let bIsASprite = b instanceof PIXI.DisplayObject; // || a instanceof Sprite;
+
+    if (aIsASprite && bIsASprite) {
+      //Yes, but what kind of sprites?
+      if(a.diameter && b.diameter) {
+        //They're cicles
+        return circleVsCircle(a, b);
+      } else {
+        //They're rectangles
+        return rectangleVsRectangle(a, b);
+      }
+    }
+    //They're not both sprites, so what are they?
+    //Is `a` not a sprite and does it have x and y properties?
+    else if (a.x && a.y && bIsASprite) {
+      //Yes, so this is a point vs. sprite collision test
+      return hitTestPoint(a, b);
+    }
+    else {
+      //The user is trying to test some incompatible objects
+      throw new Error(`I'm sorry, ${a} and ${b} cannot be use together in a collision test.'`);
+    }
+  }
+  
+  function spriteVsArray() {
+    //If `a` happens to be the array, flip it around so that it becomes `b`
+    if (a instanceof Array) {
+      let [a, b] = [b, a];
+    }
+    //Loop through the array in reverse
+    for (let i = b.length - 1; i >= 0; i--) {
+      let sprite = b[i];
+      collision = findCollisionType(a, sprite); 
+      if (collision && extra) extra(collision, sprite);
+    }
+  }
+
+  function circleVsCircle(a, b) {
+    //If the circles shouldn't react to the collision,
+    //just test to see if they're touching
+    if(!react) {
+      return hitTestCircle(a, b);
+    } 
+    //Yes, the cicles should react to the collision
+    else {
+      //Are they both moving?
+      if (a.vx + a.vy !== 0 && b.vx + b.vy !== 0) {
+        //Yes, they are both moving
+        //(moving circle collisions always bounce apart so there's
+        //no need for the third, `bounce`, argument)
+        return movingCircleCollision(a, b);
+      }
+      else {
+        //No, they're not both moving
+        //Should they bounce apart?
+        //Yes
+        if(bounce) {
+          return circleCollision(a, b, false);
+        } 
+        //No
+        else {
+          return circleCollision(a, b, true); 
+        }
+      }
+    }
+  }
+
+  function rectangleVsRectangle(a, b) {
+    //If the rectangles shouldn't react to the collision, just
+    //test to see if they're touching
+    if(!react) {
+      return hitTestRectangle(a, b);
+    } 
+    //Yes
+    else {
+      //Should they bounce apart?
+      //Yes
+      if(bounce) {
+        return rectangleCollision(a, b, true);
+      } 
+      //No
+      else {
+        return rectangleCollision(a, b, false); 
+      }
+    }
+  }
+}

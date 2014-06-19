@@ -5,6 +5,7 @@ module interactive from "library/interactive";
 module sound from "library/sound";
 module haiku from "library/haiku";
 module tween from "library/plugins/Tween";
+module pixiDisplay from "library/pixiDisplay";
 
 export class Game {
   constructor(config) {
@@ -145,12 +146,13 @@ export class PixiGame {
 
     //Create the Pixi and renderer using the config 
     //object's `height` and `width` properties
-    this.renderer = PIXI.autoDetectRenderer(config.width, config.height);
-    this.canvas = renderer.view;
+    let dips = window.devicePixelRatio;
+    this.renderer = PIXI.autoDetectRenderer(config.width * dips, config.height * dips);
+    this.canvas = this.renderer.view;
     document.body.appendChild(this.canvas);
 
-    //Initialize the pointer
-    this.pointer.initialize();
+    //Initialize the Pixi Pointer in library/pixiDisplay
+    this.pointer = new this.Pointer();
 
     //Set the game `state`
     this.state = undefined;
@@ -163,7 +165,7 @@ export class PixiGame {
     //missing
     if(this.setup === undefined) {
       throw new Error(
-        "Please supply the setup function in the Game constructor"
+        "Please supply the setup function in the constructor"
       );
     }
 
@@ -178,8 +180,6 @@ export class PixiGame {
   //The engine's game loop
   gameLoop() {
     requestAnimationFrame(this.gameLoop.bind(this), this.canvas);
-    //Update the buttons
-    this.updateButtons();
     //Update the TWEEN object
     this.TWEEN.update();
     //Run the current game state if it's been defined and
@@ -188,7 +188,7 @@ export class PixiGame {
       this.state();
     }
     //Render the canvas
-    this.render(this.canvas);
+    this.renderer.render(this.stage);
   }
 
   //The `start` method that gets the whole engine going
@@ -223,19 +223,10 @@ export class PixiGame {
   resume() {
     this.paused = false;
   }
-  //Update all the buttons in the game
-  updateButtons() {
-    if (this.buttons.length > 0) {
-      this.canvas.style.cursor = "auto";
-      for(let i = 0; i < this.buttons.length; i++) {
-        let button = this.buttons[i];
-        button.update(this.pointer, this.canvas);
-        if (button.state === "over" || button.state === "down") {
-          this.canvas.style.cursor = "pointer";
-        }
-      }
-    }
-  }
+}
+
+export function pixiGame(width, height, setup, assets, load) {
+  return new PixiGame({width, height, setup, assets, load});
 }
 
 

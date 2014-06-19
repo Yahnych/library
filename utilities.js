@@ -396,14 +396,14 @@ Move a sprite by adding it's velocity to it's position
 export function move(...sprites) {
   if (sprites.length === 1) {
     let s = sprites[0];
-    s.p.x += s.v.x;
-    s.p.y += s.v.y;
+    s.x += s.vx;
+    s.y += s.vy;
   }
   else {
     for (let i = 0; i < sprites.length; i++) {
       let s = sprites[i];
-      s.p.x += s.v.x;
-      s.p.y += s.v.y;
+      s.x += s.vx;
+      s.y += s.vy;
     }
   }
 }

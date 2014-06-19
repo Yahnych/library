@@ -1,10 +1,12 @@
 
-export let stage = new PIXI.Stage(0xCCFFCC);
+export let stage = new PIXI.Stage(0xFFFFFF);
 
 function addProperties(sprite) {
-  sprite.v = {x: 0, y: 0};
+  sprite.vx = 0; 
+  sprite.vy = 0;
   sprite._layer = 0;
   sprite._draggable = undefined;
+  sprite._circular = false;
 
   Object.defineProperties(sprite, {
     halfWidth: {
@@ -19,11 +21,17 @@ function addProperties(sprite) {
       },
       enumerable: true, configurable: true
     },
+    centerX: {
+      get() {return this.parentX + this.halfWidth}
+    },
+    centerY: {
+      get() {return this.parentY + this.halfHeight}
+    },
     center: {
       get() {
         return {
-          x: this.x + this.halfWidth,
-          y: this.y + this.halfHeight
+          x: this.parentX + this.halfWidth,
+          y: this.parentY + this.halfHeight
         };
       },
       enumerable: true, configurable: true
@@ -31,8 +39,8 @@ function addProperties(sprite) {
     bottom: {
       get () {
         return {
-          x: this.x + this.halfWidth,
-          y: this.y + this.height
+          x: this.worldX + this.halfWidth,
+          y: this.worldY + this.height
         };
       },
       enumerable: true, configurable: true
@@ -54,7 +62,43 @@ function addProperties(sprite) {
       set(value) {
         if (this._draggable === undefined) makeDraggable(this);
         this._draggable = value;
-      }
+      },
+      enumerable: true, configurable: true
+    },
+    circular: {
+      get() {
+        return this._circular;
+      },
+      set(value) {
+        //Give the sprite `diameter` and `radius` properties
+        //if `circular` is `true`
+        if (value === true && this._circular === false) {
+          makeCircular(this);
+          this._circular = true;
+        }
+        //Remove the sprite's `diameter` and `radius` properties
+        //if `circular` is `false`
+        if (value === false && this._circular === true) {
+          delete this.diameter;
+          delete this.radius;
+          this._circular = false;
+        }
+      },
+      enumerable: true, configurable: true
+    },
+    //The sprite's parent's x and y position
+    parentX: {
+      get() {return this.x + this.parent.x}
+    },
+    parentY: {
+      get() {return this.y + this.parent.y}
+    },
+    //The sprite's world position
+    worldX: {
+      get() {return this.worldTransform.tx}
+    },
+    worldY: {
+      get() {return this.worldTransform.ty}
     }
   });
   //Create `add` and `remove` methods to manage child objects
@@ -63,7 +107,7 @@ function addProperties(sprite) {
       sprite.addChild(spriteToAdd);
     });
   };
-  sprite.remove = (...spritesRemove) => {
+  sprite.remove = (...spritesToRemove) => {
     spritesToRemove.forEach((spriteToRemove) => {
       //Remove the sprite from this container
       sprite.removeChild(spriteToRemove);
@@ -74,8 +118,9 @@ function addProperties(sprite) {
 }
 
 export function rectangle(
-    x = 0, y = 0, width = 32, height = 32, rotation = 0, 
-    fillStyle = 0xFF3300, strokeStyle = 0x0033CC, lineWidth = 0
+    width = 32, height = 32,  
+    fillStyle = 0xFF3300, strokeStyle = 0x0033CC, lineWidth = 0,
+    x = 0, y = 0 
   ){
   //Draw the rectangle
   let rectangle = new PIXI.Graphics();
@@ -96,26 +141,14 @@ export function rectangle(
   sprite.y = y;
   //Add some extra properties to the sprite
   addProperties(sprite);
-  //Rotate it
-  if (rotation !== 0) {
-    //Move the sprite's pivot point to its center
-    sprite.pivot.x = sprite.halfWidth;
-    sprite.pivot.y = sprite.halfHeight;
-    //Rotate the sprite
-    sprite.rotation = rotation;
-    //Add half the sprite's height and width to re-position
-    //it according to its original x/y position
-    sprite.x += sprite.halfWidth;
-    sprite.y += sprite.halfHeight;
-  }
   //Add the `sprite` to the `stage` 
   stage.addChild(sprite);
   return sprite;
 }
 
 export function circle(
-    x = 0, y = 0, diameter = 32, rotation = 0,
-    fillStyle = 0xFF3300, strokeStyle = 0x0033CC, lineWidth = 0
+    diameter = 32, fillStyle = 0xFF3300, strokeStyle = 0x0033CC, lineWidth = 0,
+    x = 0, y = 0 
   ){
   //Draw the circle
   let circle = new PIXI.Graphics();
@@ -136,19 +169,14 @@ export function circle(
   sprite.y = y;
   //Add some extra properties to the sprite
   addProperties(sprite);
-  //Rotate it
-  if (rotation !== 0) {
-    //Move the sprite's pivot point to its center
-    sprite.pivot.x = sprite.halfWidth;
-    sprite.pivot.y = sprite.halfHeight;
-    //Rotate the sprite
-    sprite.rotation = rotation;
-    //Add half the sprite's height and width to re-position
-    //it according to its original x/y position
-    sprite.x += sprite.halfWidth;
-    sprite.y += sprite.halfHeight;
-  }
   //Add `diameter` and `radius` getters and setters
+  makeCircular(sprite);
+  //Add the `sprite` to the `stage` 
+  stage.addChild(sprite);
+  return sprite;
+}
+
+function makeCircular(sprite) {
   Object.defineProperties(sprite, {
     diameter: {
       get() {
@@ -171,14 +199,11 @@ export function circle(
       enumerable: true, configurable: true
     }
   });
-  //Add the `sprite` to the `stage` 
-  stage.addChild(sprite);
-  return sprite;
 }
 
 export function line(
-    ax = 0, ay = 0, bx = 32, by = 32, 
-    strokeStyle = 0x000000, lineWidth = 1 
+    strokeStyle = 0x000000, lineWidth = 1, 
+    ax = 0, ay = 0, bx = 32, by = 32
   ){
   //Create the line object
   let line = new PIXI.Graphics();
@@ -243,192 +268,169 @@ export function line(
       enumerable: true, configurable: true
     },
   });
-  //Add the `sprite` to the `stage` 
+  //Add the `line` to the `stage` 
   stage.addChild(line);
   return line;
 }
 
-export function tile(
-    x = 0, y = 0, width = 32, height = 32, rotation = 0,
-    source = undefined, sourceX = 0, sourceY = 0, 
-    sourceWidth = 32, sourceHeight = 32
-  ){
-  let base, section, texture, sprite;
+export function sprite(source, x = 0, y = 0, tiling = false, width, height) {
+  let texture, sprite;
 
-  //Use the source to make the texture
-  base = new PIXI.BaseTexture(source);
-  let section = new PIXI.Rectangle(
-    sourceX, sourceY, sourceWidth, sourceHeight
-  );
-  texture = new PIXI.Texture(base, section);
-  sprite = new PIXI.Sprite(texture);
-
-  //Save a reference to the base texture and the source position
-  //so we can use them later if we need to
-  sprite._baseTexture = base;
-  sprite._sourceX = sourceX;
-  sprite._sourceY = sourceY;
-  sprite._sourceWidth = sourceWidth;
-  sprite._sourceHeight = sourceHeight;
-
-  //Position the sprite
-  sprite.x = x;
-  sprite.y = y;
-
-  //Add some extra properties to the sprite
-  addProperties(sprite);
-
-  //Rotate it
-  if (rotation !== 0) {
-    //Move the sprite's pivot point to its center
-    sprite.pivot.x = sprite.halfWidth;
-    sprite.pivot.y = sprite.halfHeight;
-    //Rotate the sprite
-    sprite.rotation = rotation;
-    //Add half the sprite's height and width to re-position
-    //it according to its original x/y position
-    sprite.x += sprite.halfWidth;
-    sprite.y += sprite.halfHeight;
-  }
-
-  //A helper method that lets sprites change their texture
-  //based on new `sourceX` and `sourceY` values
-  sprite.makeTexture = (sprite, sourceX, sourceY) => {
-    let section = new PIXI.Rectangle(
-      sourceX, sourceY, sprite._sourceWidth, sprite._sourceHeight
-    );
-    sprite.texture = new PIXI.Texture(sprite._baseTexture, section);
-    //sprite.setTexture(texture);
-  };
-
-  //Define getters and setters that redefine the line's start and 
-  //end points and re-draws it if they change
-  Object.defineProperties(sprite, {
-    sourceX: {
-      set(value) {
-        this._sourceX = value;
-        this.makeTexture(this, this._sourceX, this._sourceY);
-      }, 
-      enumerable: true, configurable: true
-    },
-    sourceY: {
-      set(value) {
-        this._sourceY = value;
-        this.makeTexture(this, this._sourceX, this._sourceY);
-      }, 
-      enumerable: true, configurable: true
-    },
-  });
-  //Add the `sprite` to the `stage` 
-  stage.addChild(sprite);
-  return sprite;
-}
-
-export function roundTile( 
-    x = 0, y = 0, diameter = 32, rotation = 0,
-    source = undefined, sourceX = 0, sourceY = 0, 
-    sourceWidth = 32, sourceHeight = 32
-  ){
-  //Make an ordinary `tile` sprite;
-  let sprite = tile(
-    x, y, diameter, diameter, rotation,
-    source, sourceX, sourceY, sourceWidth, sourceHeight
-  );
-  //Add `diameter` and `radius` getters and setters
-  Object.defineProperties(sprite, {
-    diameter: {
-      get() {
-        return this.width;
-      },
-      set(value) {
-        this.width = value;
-        this.height = value;
-      },
-      enumerable: true, configurable: true
-    },
-    radius: {
-      get() {
-        return this.width / 2;
-      },
-      set(value) {
-        this.width = value * 2;
-        this.height = value * 2;
-      }, 
-      enumerable: true, configurable: true
+  //Create a sprite if the `source` is a string 
+  if (typeof source === "string") {
+    //Access the texture in the cache if its there
+    if (PIXI.TextureCache[source]) {
+      texture = PIXI.TextureCache[source];
     }
-  });
-  //The `sprite` has already been added to the stage when the
-  //`tile` was made
-  return sprite; 
+    //If it's not is the cache, load it from the source file
+    else {
+      texture = PIXI.Texture.fromImage(source);
+    }
+    //If the texture was created, make the sprite
+    if(texture) {
+      //If `tiling` is `false`, make a regular `Sprite`
+      if(!tiling) {
+        sprite = new PIXI.Sprite(texture);
+      } 
+      //If `tiling` is `true` make a `TilingSprite`
+      else {
+        sprite = new PIXI.TilingSprite(texture, width, height);
+      }
+    }
+    //But if the source still can't be found, alert the user
+    else {
+      console.log(`${source} cannot be found`);
+    }
+  } 
+  //Create a sprite if the `source` is a texture
+  else if (source instanceof PIXI.Texture) {
+    if (!tiling) {
+      sprite = new PIXI.Sprite(source);
+    }else{
+      sprite = new PIXI.TilingSprite(source, width, height);
+    }
+  }
+  //Create a `MovieClip` sprite if the `source` is an array
+  else if (source instanceof Array) {
+    //Is it an array of frame ids or textures?
+    if(typeof source[0] === "string") {
+      //They're strings, but are they pre-existing texture or
+      //paths to image files?
+      //Check to see if the first element matches a texture in the
+      //cache
+      if(PIXI.TextureCache[source[0]]){
+        //It does, so it's an array of frame ids
+        sprite = PIXI.MovieClip.prototype.fromFrames(source);
+      }
+      else {
+        //It's not already in the cache, so let's load them from files
+        sprite = PIXI.MovieClip.prototype.fromImages(source);
+      }
+    }
+    //If the `source` isn't an array of strings, check whether
+    //it's an array of textures
+    else if (source[0] instanceof PIXI.Texture) {
+      //Yes, it's an array of textures. 
+      //Use them to make a MovieClip sprite 
+      sprite = new PIXI.MovieClip(source);
+    }
+  }
+  //If the sprite was successfully created, set intialize it
+  if(sprite) {
+    //Position the sprite
+    sprite.x = x;
+    sprite.y = y;
+    //Set optional width and height
+    if (width) sprite.width = width;
+    if (height) sprite.height = height;
+    //Add some extra properties to the sprite
+    addProperties(sprite);
+    //Add the `sprite` to the `stage` 
+    stage.addChild(sprite);
+    return sprite;
+  }
 }
 
-export function message(
-    x = 0, y = 0, text = "message", 
-    font = "16px sans", fillStyle = "red"
+//Make a texture from a frame in another texture or image
+export function frame(source, x, y, width, height) {
+  let texture, imageFrame;
+  //If the source is a string, it's either a texture in the
+  //cache or an image file
+  if (typeof source === "string") {
+    if (PIXI.TextureCache[source]) {
+      texture = new PIXI.Texture(PIXI.TextureCache[source]);
+    } 
+  }
+  //If the `source` is a texture,  use it
+  else if (source instanceof PIXI.Texture) {
+    texture = new PIXI.Texture(source);
+  }
+  if(!texture) {
+    console.log(`Please load the ${source} texture into the cache.`);
+  } else {
+    //Make a rectangle the size of the sub-image
+    imageFrame = new PIXI.Rectangle(x, y, width, height);
+    texture.setFrame(imageFrame);
+    return texture;
+  }
+}
+
+//Make an array of textures from a 2D array of frame x and y coordinates in
+//texture
+export function frames(source, coordinates, frameWidth, frameHeight) {
+  let baseTexture, textures;
+  //If the source is a string, it's either a texture in the
+  //cache or an image file
+  if (typeof source === "string") {
+    if (PIXI.TextureCache[source]) {
+      baseTexture = new PIXI.Texture(PIXI.TextureCache[source]);
+    } 
+  }
+  //If the `source` is a texture,  use it
+  else if (source instanceof PIXI.Texture) {
+    baseTexture = new PIXI.Texture(source);
+  }
+  if(!baseTexture) {
+    console.log(`Please load the ${source} texture into the cache.`);
+  } else {
+    let textures = coordinates.map((position) => {
+      let x = position[0],
+          y = position[1];
+      let imageFrame = new PIXI.Rectangle(x, y, frameWidth, frameHeight);
+      let frameTexture = new PIXI.Texture(baseTexture);
+      frameTexture.setFrame(imageFrame);
+      return frameTexture 
+    });
+    return textures;
+  }
+}
+
+export function text(
+    content = "message", font = "16px sans",
+    fillStyle = "red", x = 0, y = 0
   ){
-  let message = new PIXI.Text(text, {font: font, fill: fillStyle});
+  let message = new PIXI.Text(content, {font: font, fill: fillStyle});
   message.x = x;
   message.y = y;
-  message.changeText = (newText) => {
-    message.setText(newText);
-  };
   //Add a `_text` property with a getter/setter
-  message._text = text;
+  message._content = content;
   Object.defineProperty(message, "content", {
     get() {
-      return this._text;
+      return this._content;
     },
     set(value) {
-      this._text = value;
+      this._content = value;
       this.setText(value);
     },
     enumerable: true, configurable: true
   });
+  //Add some extra sprite properties
+  addProperties(message);
   //Add the `message` to the `stage` 
   stage.addChild(message);
   return message;
 }
 
-export function image(x = 0, y = 0, rotation = 0, source = undefined) {
-  let base, texture, sprite;
-  //Use the source to make the texture
-  base = new PIXI.BaseTexture(source);
-  texture = new PIXI.Texture(base);
-  sprite = new PIXI.Sprite(texture);
-
-  //Position the sprite
-  sprite.x = x;
-  sprite.y = y;
-  
-  //Add some extra properties to the sprite
-  addProperties(sprite);
-  
-  //Rotate it
-  if (rotation !== 0) {
-    //Move the sprite's pivot point to its center
-    sprite.pivot.x = sprite.halfWidth;
-    sprite.pivot.y = sprite.halfHeight;
-    //Rotate the sprite
-    sprite.rotation = rotation;
-    //Add half the sprite's height and width to re-position
-    //it according to its original x/y position
-    sprite.x += sprite.halfWidth;
-    sprite.y += sprite.halfHeight;
-  }
-
-  //Allow the user to change the image's source
-  Object.defineProperty(sprite, "source", {
-    set(value) {
-      let base = new PIXI.BaseTexture(value);
-      sprite.texture = new PIXI.Texture(base);
-    },
-    enumerable: true, configurable: true
-  });
-
-  //Add the `sprite` to the `stage` 
-  stage.addChild(sprite);
-  return sprite;
-}
 
 /*
 group and batch
@@ -442,6 +444,9 @@ export function group(...spritesToGroup) {
   });
   //Add the group properties
   addGroupProperties(container);
+  //Add the sprite properties, so you make the
+  //group draggable or change its layer position
+  addProperties(container);
   //Add the `container` to the `stage` 
   stage.addChild(container);
   return container;
@@ -462,7 +467,7 @@ export function batch(...spritesToGroup) {
 export function remove(...spritesToRemove) {
   spritesToRemove.forEach((sprite) => {
     //Remove the sprite from the stage
-    stage.removeChild(sprite);
+    sprite.parent.removeChild(sprite);
   });
 }
 
@@ -509,14 +514,13 @@ grid
 */
 
 export function grid(
-    xOffset = 0, yOffset = 0, columns = 5, rows = 5,  
-    cellWidth = 32, cellHeight = 32, centerCell = false,
+    columns = 5, rows = 5, cellWidth = 32, cellHeight = 32, 
+    centerCell = false, xOffset = 0, yOffset = 0,
     makeSprite = undefined, 
     extra = undefined
   ){ 
   //Create an empty DisplayObjectContainer
   let container = group();
-
   //The `create` method
   container.createGrid = () => {
     let length = columns * rows;
@@ -545,7 +549,7 @@ export function grid(
     }
   };
   container.createGrid();
-
+  stage.addChild(container);
   return container;
 }
 
@@ -554,112 +558,128 @@ button
 ------
 */
 
-export function button(
-    x = 0, y = 0, width = 32, height = 32, rotation = 0,
-    source = undefined, sourceWidth = 32, sourceHeight = 32,
-    upX, upY, overX, overY, downX, downY,
-    press = undefined, release = undefined
-  ){
-
-  //Make a `tile` sprite
-  let button = tile(
-    x, y, width, height, rotation, 
-    source, upX, upY, sourceWidth, sourceHeight
-  ); 
-  
-  //Assign the button's properties
-  button.upX = upX;
-  button.upY = upY;
-  button.overX = overX;
-  button.overY = overY;
-  button.downX = downX;
-  button.downY = downY;
-  button.press = press;
-  button.release = release
-  //Make the sprite interactive
-  if (!stage.interacive) stage.setInteractive(true);
-  button.interactive = true;
-  button.buttonMode = true;
-
-  //The button's local and parent coordinates
-  button.localX = 0;
-  button.localY = 0;
-  button.parentX = 0;
-  button.parentY = 0;
-
-  //The button's `state` and `action`
-  button.state = "up";
-  button.action = "";
-
-  //If the left mouse button is pressed or
-  //the button is touched
-  button.mousedown 
-    = button.touchstart 
-    = (data) => {
-      button.action = "press";
-      button.state = "down";
-			button.isDown = true;
-      button.sourceX = button.downX;
-      button.sourceY = button.downY;
-      if (button.press) button.press();
-		};
-
-  //If the left mouse button is released or the
-  //touch ends
-  button.mouseup 
-    = button.touchend 
-    = button.mouseupoutside 
-    = button.touchendoutside 
-    = (data) => {
-        button.isDown = false;
-        if (button.isOver) {
-          button.state = "over";
-          button.sourceX = button.overX
-          button.sourceY = button.overY;
-        } else {
-          button.state = "up";
-          button.action = "release";
-          button.sourceX = button.upX;
-          button.sourceY = button.upY;
-          if (button.release) button.release();
-        }
-		  };
-
-  //If the mouse moves over the sprite   
-  button.mouseover = (data) => {
-    button.state = "over";
-    button.isOver = true;
-    if (button.isDown) return;
-    button.sourceX = button.overX
-    button.sourceY = button.overY;
-  }; 
-
-  //If the mouse leaves the sprite
-  button.mouseout = (data) => {
-    button.state = "up";
-		button.isOver = false;
-		if (button.isDown) return;
-    button.sourceX = button.upX
-    button.sourceY = button.upY;
-	};
-
-  //If the left mouse button is clicked or tapped
-  button.click = button.tap = (data) => {
-    button.action = "release";
-    if (button.release) button.release();
-  };
-
-  button.mousemove = button.touchmove = (data) => {
-    //Set the local and parent x/y pointer positions
-    let localPosition = data.getLocalPosition(button); 
-    let parentPosition = data.getLocalPosition(button.parent);
-    button.localX = localPosition.x;
-    button.localY = localPosition.y;
-    button.parentX = parentPosition.x;
-    button.parentY = parentPosition.y;
-  };
-  return button;
+export function button(textureArray, press = undefined, release = undefined){
+  let buttonSprite = new Button(textureArray);
+  if (press) buttonSprite.press = press;
+  if (release) buttonSprite.release = release;
+  stage.addChild(buttonSprite);
+  return buttonSprite;
 }
+
+class Button extends PIXI.MovieClip {
+  constructor(textureArray) {
+    //Check to see if the button states are textures. If they're
+    //not, they must be frames, so create textures from the frames
+    let newTextures;
+    if(textureArray[0] instanceof PIXI.Texture) {
+      newTextures = textureArray;
+    } else {
+      newTextures = textureArray.map((texture) => {
+        return PIXI.Texture.fromFrame(texture);
+      }); 
+    } 
+    //Create the `MovieClip` sprite using the textures
+    super(newTextures);
+
+    //Make the sprite interactive
+    if (!stage.interacive) stage.setInteractive(true);
+    this.interactive = true;
+    this.buttonMode = true;
+
+    //The buttons's local and parent coordinates
+    this.localX = 0;
+    this.localY = 0;
+    this.parentX = 0;
+    this.parentY = 0;
+
+    //The button's `state` and `action`
+    this.state = "up";
+    this.action = "";
+
+    //If the mouse is pressed or the button is touched
+    this.mousedown 
+      = this.touchstart 
+      = (data) => {
+        this.action = "press";
+        this.state = "down";
+        this.isDown = true;
+        //Display the last texture in the list (down or over)
+        this.gotoAndStop(newTextures.length -1);
+        if (this.press) this.press();
+      };
+
+    //If the mouse is released or the touch ends
+    this.mouseup 
+      = this.touchend 
+      = this.mouseupoutside 
+      = this.touchendoutside 
+      = (data) => {
+          this.isDown = false;
+          if (this.isOver) {
+            this.state = "over";
+            //Display the over texture
+            this.gotoAndStop(1);
+          } else {
+            this.state = "up";
+            this.action = "release";
+            //Display the first texture (up)
+            this.gotoAndStop(0);
+            if (this.release) this.release();
+          }
+        };
+
+    //If the mouse moves over the sprite   
+    this.mouseover = (data) => {
+      this.state = "over";
+      this.isOver = true;
+      if (this.isDown) return;
+      //Display the second texture (over)
+      this.gotoAndStop(1);
+    }; 
+
+    //If the mouse leaves the sprite
+    this.mouseout = (data) => {
+      this.state = "up";
+      this.isOver = false;
+      if (this.isDown) return;
+      //Display the first texture (up)
+      this.gotoAndStop(0);
+    };
+
+    //If the mouse is clicked or this sprite is tapped
+    this.click = this.tap = (data) => {
+      this.action = "release";
+      if (this.release) this.release();
+    };
+
+    //If the pointer moves
+    this.mousemove = this.touchmove = (data) => {
+      //Set the local and parent x/y pointer positions
+      let localPosition = data.getLocalPosition(this); 
+      let parentPosition = data.getLocalPosition(this.parent);
+      this.localX = localPosition.x;
+      this.localY = localPosition.y;
+      this.parentX = parentPosition.x;
+      this.parentY = parentPosition.y;
+    };
+  }
+}
+
+export class Pointer {
+  constructor() {
+    if (!stage.interactive) stage.interactive = true;
+    stage.mousemove = stage.touchmove = (data) => {
+      this.localPosition = data.getLocalPosition(stage); 
+    }
+  }
+  get x() {
+    return this.localPosition.x;
+  }
+  get y() {
+    return this.localPosition.y;
+  }
+}
+
 
 /*
 makeDraggable
@@ -721,6 +741,63 @@ function makeDraggable(sprite) {
       sprite.oldPointerX = sprite.pointer.x;
       sprite.oldPointerY = sprite.pointer.y;
     }
+  }
+}
+export let progressBar = {
+  maxWidth: 0, 
+  height: 0,
+  backgroundColor: 0xC0C0C0, //gray
+  foregroundColor: 0x00FFFF, //cyan
+  backBar: null,
+  frontBar: null,
+  percentage: null,
+  assets: null,
+  initialized: false,
+  create(canvas, assets) {
+    if (!this.initialized) {
+      //Store a reference to the `assets` object
+      this.assets = assets;
+      //Set the maximum width to half the width of the canvas
+      this.maxWidth = canvas.width / 2;
+
+      //Build the progress bar using two Rectangle sprites and
+      //one Message Sprite
+      //1. Create the bar's gray background
+      this.backBar = rectangle(this.maxWidth, 32, this.backgroundColor);
+      this.backBar.x = (canvas.width / 2) - (this.maxWidth / 2);
+      this.backBar.y = (canvas.height / 2) - 16;
+
+      //2. Create the blue foreground. This is the element of the 
+      //progress bar that will increase in width as assets load
+      this.frontBar = rectangle(this.maxWidth, 32, this.foregroundColor);
+      this.frontBar.x = (canvas.width / 2) - (this.maxWidth / 2);
+      this.frontBar.y = (canvas.height / 2) - 16;
+      this.frontBar.scale.x = 0;
+      //
+      //3. A text sprite that will display the percentage
+      //of assets that have loaded
+      this.percentage = text("0%", "28px sans-serif", "black");
+      this.percentage.x = (canvas.width / 2) - (this.maxWidth / 2) + 12;
+      this.percentage.y = (canvas.height / 2) - 16;
+
+      //Flag the progressBar as having been initialized
+      this.initialized = true;
+    }
+  },
+  update() {
+    //Change the width of the blue `frontBar` to match the 
+    //ratio of assets that have loaded
+    this.frontBar.scale.x = this.assets.loaded / this.assets.toLoad;
+      //(this.maxWidth / this.assets.toLoad) * this.assets.loaded;
+    //Display the percentage
+    this.percentage.content = 
+      `${Math.floor((this.assets.loaded / this.assets.toLoad) * 100)}%`;
+  },
+  remove() {
+    //Remove the progress bar
+    stage.removeChild(this.frontBar);
+    stage.removeChild(this.backBar);
+    stage.removeChild(this.percentage);
   }
 }
 
