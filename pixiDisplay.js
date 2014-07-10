@@ -335,6 +335,22 @@ export function sprite(source, x = 0, y = 0, tiling = false, width, height) {
       sprite = new PIXI.MovieClip(source);
     }
   }
+  //If you have no idea what the source is, or it's undefined,
+  //create a MovieClip with a red rectangle as a place holder
+  //and decide what to do with it later
+  else if (!source) {
+    //Draw a rectangle
+    let rectangle = new PIXI.Graphics();
+    rectangle.beginFill(0, 0xFF0000);
+    rectangle.drawRect(0, 0, width, height);
+    rectangle.endFill();
+    //Remove default padding of 10 pixels on graphics objects
+    rectangle.boundsPadding = 0;
+    //Generate a texture from the rectangle
+    let texture = rectangle.generateTexture();
+    //Use the texture to create a sprite
+    sprite = new PIXI.MovieClip([texture]);
+  }
   //If the sprite was successfully created, set intialize it
   if(sprite) {
     //Position the sprite
@@ -667,16 +683,57 @@ class Button extends PIXI.MovieClip {
 
 export class Pointer {
   constructor() {
+    //Make the `stage` interactive if it isn't already
     if (!stage.interactive) stage.interactive = true;
+
+    //The pointer's position
+    this._x = 0;
+    this._y = 0;
+    this.localPosition;
+    
+    //The pointer's `state` and `action`
+    this.state = "up";
+    this.action = "";
+
+    //If the pointer is pressed down
+    stage.mousedown = stage.touchstart = (data) => {
+        this.action = "press";
+        this.state = "down";
+        this.isDown = true;
+        //Call the `press` method if it's been defined
+        if (this.press) this.press();
+    };
+
+    //If the pointer is released
+    stage.mouseup 
+      = stage.touchend 
+      = stage.mouseupoutside 
+      = stage.touchendoutside 
+      = (data) => {
+        this.isDown = false;
+        this.state = "up";
+        this.action = "release";
+        //Call the `release` method if it's been defined
+        if (this.release) this.release();
+    };
+
+    //Update the pointer's x and y position if its moving
     stage.mousemove = stage.touchmove = (data) => {
       this.localPosition = data.getLocalPosition(stage); 
-    }
+    };
   }
+  //Get the pointer's x and y position
   get x() {
-    return this.localPosition.x;
+    if (this.localPosition) {
+      this._x = this.localPosition.x;
+    } 
+    return this._x;
   }
   get y() {
-    return this.localPosition.y;
+    if (this.localPosition) {
+      this._y = this.localPosition.y;
+    } 
+    return this._y;
   }
 }
 
@@ -788,7 +845,7 @@ export let progressBar = {
     //Change the width of the blue `frontBar` to match the 
     //ratio of assets that have loaded
     this.frontBar.scale.x = this.assets.loaded / this.assets.toLoad;
-      //(this.maxWidth / this.assets.toLoad) * this.assets.loaded;
+    //(this.maxWidth / this.assets.toLoad) * this.assets.loaded;
     //Display the percentage
     this.percentage.content = 
       `${Math.floor((this.assets.loaded / this.assets.toLoad) * 100)}%`;
@@ -801,6 +858,664 @@ export let progressBar = {
   }
 }
 
+/*
+makeTiledMap
+*/
+
+export function makeTiledWorld(tiledMap, tileset) {
+  //Create a group called `world` to contain all the layers, sprites
+  //and objects from the `tiledMap`. The `world` object is going to be
+  //returned to the main game program
+  let world = group();
+  world.tileheight = tiledMap.tileheight;
+  world.tilewidth = tiledMap.tilewidth;
+  //Calculate the `width` and `height` of the world, in pixels
+  world.width = tiledMap.width * tiledMap.tilewidth;
+  world.height = tiledMap.height * tiledMap.tileheight;
+  //Get a reference to the world's height and width in
+  //tiles, in case you need to know this later (you will!)
+  world.widthInTiles = tiledMap.width;
+  world.heightInTiles = tiledMap.height;
+
+  //Create an `objects` array to store references to any
+  //named objects in the map. Named objects all have
+  //a `name` property that was assigned in Tiled Editor
+  world.objects = [];
+  
+  //The optional spacing (padding) around each tile
+  //This is to account for spacing around tiles
+  //that's commonly used with texture atlas tilesets. Set the 
+  //`spacing` property when you create a new map in Tiled Editor 
+  let spacing = tiledMap.tilesets[0].spacing;  
+
+  //Figure out how many columns there are on the tileset.
+  //This is the width of the image, divided by the width
+  //of each tile, plus any optional spacing thats around each tile
+  let numberOfTilesetColumns =
+    Math.floor(
+      tiledMap.tilesets[0].imagewidth 
+      / (tiledMap.tilewidth + spacing)
+    );
+
+  //Loop through all the map layers
+  tiledMap.layers.forEach((tiledLayer) => {
+    //Make a PIXI.DisplayObjectContainer for this layer and copy
+    //all of the layer properties onto it. 
+    let layerGroup = group();
+    Object.assign(layerGroup, tiledLayer);
+    //Translate `opacity` to `alpha`
+    layerGroup.alpha = tiledLayer.opacity;
+    //Add the group to the `world`
+    world.addChild(layerGroup);
+
+    //Push the group into the world's `objects` array
+    //So you can access it later
+    world.objects.push(layerGroup);
+
+    //Is this current layer a `tilelayer`?
+    if (tiledLayer.type === "tilelayer") {
+      
+      //Loop through the `data` array of this layer 
+      tiledLayer.data.forEach((gid, index) => {
+        let tileSprite, texture, mapX, mapY, tilesetX, tilesetY, 
+            mapColumn, mapRow, tilesetColumn, tilesetRow; 
+        //If the grid id number (`gid`) isn't zero, create a sprite
+        if (gid !== 0) {
+          //Figure out the map column and row number that we're on, and then
+          //calculate the grid cell's x and y pixel position.
+          mapColumn = index % world.widthInTiles;
+          mapRow = Math.floor(index / world.widthInTiles);
+          mapX =  mapColumn * world.tilewidth;
+          mapY =  mapRow * world.tileheight;
+
+          //Figure out the column and row number that the tileset
+          //image is on, and then use those values to calculate
+          //the x and y pixel position of the image on the tileset
+          tilesetColumn = ((gid - 1) % numberOfTilesetColumns);
+          tilesetRow = Math.floor((gid - 1) / numberOfTilesetColumns);
+          tilesetX = tilesetColumn * world.tilewidth;
+          tilesetY = tilesetRow * world.tileheight;
+
+          //Compensate for any optional spacing (padding) around the tiles if
+          //there is any. This bit of code accumlates the spacing offsets from the 
+          //left side of the tileset and adds them to the current tile's position 
+          if (spacing > 0) {
+            tilesetX 
+              += spacing 
+              + (spacing * ((gid - 1) % numberOfTilesetColumns)); 
+            tilesetY 
+              += spacing 
+              + (spacing * Math.floor((gid - 1) / numberOfTilesetColumns));
+          }
+
+          //Use the above values to create the sprite's texture from
+          //the tileset image
+          texture = frame(
+            tileset, tilesetX, tilesetY, 
+            world.tilewidth, world.tileheight
+          );
+
+          //What kind of sprite do you want to make? I've decided that
+          //any tiles that have a `name` property will be MovieClip
+          //sprites. That gives me the option to add animated frames
+          //to them later. Tiles without a `name` property will be
+          //created as ordinary sprites
+
+          let tileproperties = tiledMap.tilesets[0].tileproperties,
+              key = String(gid - 1);
+
+          //If the JSON `tileproperties` object has a sub-object that
+          //matches the current tile, and that sub-object has a `name` property,
+          //then create a MovieClip sprite
+          if (tileproperties[key] && tileproperties[key].name) {
+            //Make a MovieClip sprite by intializing the sprite
+            //with an array containing a texture. (The sprite has just one
+            //texture in the tileset, but wrap it in square
+            //brackets to show that it's the first texture in an array)
+            tileSprite = sprite([texture]);
+
+            //Copy all of the tile's properties onto the sprite
+            //(This includes the `name` property)
+            Object.assign(tileSprite, tileproperties[key]);
+
+            //Push the sprite into the world's `objects` array
+            //so that you can access it by `name` later
+            world.objects.push(tileSprite);
+          }
+
+          //If the tile doesn't have a `name` property, just use it to
+          //create an ordinary sprite (it will only need one texture)
+          else {
+            tileSprite = sprite(texture);
+          }
+          
+          //Position the sprite on the map
+          tileSprite.x = mapX;
+          tileSprite.y = mapY;
+
+          //Make a record of the sprite's index number in the array
+          //(We'll use this for collision detection later)
+          tileSprite.index = index;
+
+          //Make a record of the sprite's `gid` on the tileset.
+          //This will also be useful for collision detection later
+          tileSprite.gid = gid;
+          
+          //Add the sprite to the current layer group
+          layerGroup.addChild(tileSprite);
+        }
+      });
+    }
+
+    //Is this layer an `objectgroup`?
+    if (tiledLayer.type === "objectgroup") { 
+      tiledLayer.objects.forEach((object) => {
+        //We're just going to capture the object's properties
+        //so that we can decide what to do with it later
+
+        //Translate `opacity` to `alpha`
+        object.alpha = object.opacity;
+
+        //Get a reference to the layer group the object is in
+        object.group = layerGroup;
+
+        //Push the object into the world's `objects` array
+        world.objects.push(object);
+      });
+    }
+  });
+
+  //Search functions
+  //`world.getObject` and `world.getObjects`  search for and return
+  //any sprites or objects in the `world.objects` array. 
+  //Any object that has a `name` propery in 
+  //Tiled Editor will show up in a search.
+  //`getObject` gives you a single object, `getObjects` gives you an array
+  //of objects.
+  //`getObject` returns the actual search function, so you 
+  //can use the following format to directly access a single object:
+  //sprite.x = world.getObject("anySprite").x;
+  //sprite.y = world.getObject("anySprite").y;
+
+  world.getObject = function (objectName) {
+    this.searchForObject = () => {
+      let foundObject;
+      world.objects.some((object) => {
+        if (object.name && object.name === objectName) {
+          foundObject = object;
+          return true;
+        }
+      });
+      if (foundObject) {
+        return foundObject;
+      } else {
+        console.log(`There is no object with the property name: ${objectName}`);
+      }
+    };
+    //Return the search function
+    return this.searchForObject();
+  };
+
+  world.getObjects = function (...objectNames) {
+    let foundObjects = [];
+    world.objects.forEach((object) => {
+      if (object.name && objectNames.indexOf(object.name) !== -1) {
+        foundObjects.push(object);
+      }
+    });
+    if (foundObjects.length > 0) {
+      return foundObjects;
+    } else {
+      console.log(`I could not find those objects`);
+    }
+    return foundObjects;
+  };
+
+  //That's it, we're done!
+  //Finally, return the `world` object back to the game program
+  return world;
+}
+
+/*
+makeIsoTiledWorld
+=================
+
+An interpreter for isometric Tiled Editor JSON output.
+Important: To work it requires to custom map properties:
+`cartTilewidth` and `cartTileheight`. These are the Cartesian
+(flat 2D) dimensions of the tile map array. These are needed
+because it's common to have a 32x32 tile map array that displays
+64x64 sprites.
+*/
+
+
+export function makeIsoTiledWorld(tiledMap, tileset) {
+
+  if (!tiledMap.properties.cartTilewidth 
+  && !tiledMap.properties.cartTileheight) {
+    throw new Error("Please set custom cartTilewidth and cartTileheight map properties in Tiled Editor");
+  }
+  
+  //Create a group called `world` to contain all the layers, sprites
+  //and objects from the `tiledMap`. The `world` object is going to be
+  //returned to the main game program
+  let world = group();
+  world.tileheight = tiledMap.tileheight * 2;
+  world.tilewidth = tiledMap.tilewidth;
+
+  //Define the cartesian dimesions of each tile
+  world.cartTileheight = parseInt(tiledMap.properties.cartTileheight);
+  world.cartTilewidth = parseInt(tiledMap.properties.cartTilewidth);
+
+  //Calculate the `width` and `height` of the world, in pixels
+  world.width = tiledMap.width * parseInt(tiledMap.properties.cartTilewidth);
+  world.height = tiledMap.height * parseInt(tiledMap.properties.cartTileheight);
+  //Get a reference to the world's height and width in
+  //tiles, in case you need to know this later
+  world.widthInTiles = tiledMap.width;
+  world.heightInTiles = tiledMap.height;
+
+  //Create an `objects` array to store references to any
+  //named objects in the map. Named objects all have
+  //a `name` property that was assigned in Tiled Editor
+  world.objects = [];
+  
+  //The spacing (padding) around each tile
+  //This is to account for spacing around tiles
+  //that's commonly used with texture atlas tilesets. Set the 
+  //`spacing` property when you create a new map in Tiled Editor 
+  let spacing = tiledMap.tilesets[0].spacing;  
+
+  //Figure out how many columns there are on the tileset.
+  //This is the width of the image, divided by the width
+  //of each tile, plus any optional spacing thats around each tile
+  let numberOfTilesetColumns =
+    Math.floor(
+      tiledMap.tilesets[0].imagewidth 
+      / (tiledMap.tilewidth + spacing)
+    );
+
+  //A `z` property to help track which depth level the sprites are on
+  let z = 0;
+
+  //Loop through all the map layers
+  tiledMap.layers.forEach((tiledLayer) => {
+  
+    //Make a PIXI.DisplayObjectContainer for this layer and copy
+    //all of the layer properties onto it. 
+    let layerGroup = group();
+    Object.assign(layerGroup, tiledLayer);
+    //Translate `opacity` to `alpha`
+    layerGroup.alpha = tiledLayer.opacity;
+    //Add the group to the `world`
+    world.addChild(layerGroup);
+
+    //Push the group into the world's `objects` array
+    //So you can access it later
+    world.objects.push(layerGroup);
+
+    //Is it a `tilelayer`?
+    if (tiledLayer.type === "tilelayer") {
+      
+      //Loop through the `data` array of this layer 
+      tiledLayer.data.forEach((gid, index) => {
+        let tileSprite, texture, mapX, mapY, tilesetX, tilesetY, 
+            mapColumn, mapRow, tilesetColumn, tilesetRow; 
+        //If the grid id number (`gid`) isn't zero, create a sprite
+        if (gid !== 0) {
+          //Figure out the map column and row number that we're on, and then
+          //calculate the grid cell's x and y pixel position.
+          mapColumn = index % tiledMap.width;
+          mapRow = Math.floor(index / tiledMap.width);
+          mapX =  mapColumn * world.cartTilewidth;
+          mapY =  mapRow * world.cartTileheight;
+
+          //Figure out the column and row number that the tileset
+          //image is on, and then use those values to calculate
+          //the x and y pixel position of the image on the tileset
+          tilesetColumn = ((gid - 1) % numberOfTilesetColumns);
+          tilesetRow = Math.floor((gid - 1) / numberOfTilesetColumns);
+          tilesetX = tilesetColumn * world.tilewidth;
+          tilesetY = tilesetRow * world.tileheight;
+
+          //Compensate for any optional spacing (padding) around the tiles if
+          //there is any. This bit of code accumlates the spacing offsets from the 
+          //left side of the tileset and adds them to the current tile's position 
+          if (spacing > 0) {
+            tilesetX 
+              += spacing 
+              + (spacing * ((gid - 1) % numberOfTilesetColumns)); 
+            tilesetY 
+              += spacing 
+              + (spacing * Math.floor((gid - 1) / numberOfTilesetColumns));
+          }
+
+          //Use the above values to create the sprite's texture from
+          //the tileset image
+          texture = frame(
+            tileset, tilesetX, tilesetY, 
+            world.tilewidth, world.tileheight
+          );
+
+          //What kind of sprite do you want to make? I've decided that
+          //any tiles that have a `name` property will be MovieClip
+          //sprites. That gives me the option to add animated frames
+          //to them later. Tiles without a `name` property will be
+          //created as ordinary sprites
+
+          let tileproperties = tiledMap.tilesets[0].tileproperties,
+              key = String(gid - 1);
+
+          //If the JSON `tileproperties` object has a sub-object that
+          //matches the current tile, and it has a `name` property,
+          //create a MovieClip sprite
+          if (tileproperties[key] && tileproperties[key].name) {
+            //Make a MovieClip sprite by intializing the sprite
+            //with an array containing a texture
+            tileSprite = sprite([texture]);
+            //Copy all of the tile's properties onto the sprite
+            //(This includes the `name` property)
+            Object.assign(tileSprite, tileproperties[key]);
+            //Push the sprite into the world's `objects` array
+            //so that you can access it by `name` later
+            world.objects.push(tileSprite);
+          }
+          //The tile doesn't have a `name` property, so just use it to
+          //create an ordinary sprite (it will only need one texture)
+          else {
+            tileSprite = sprite(texture);
+          }
+          
+          //Add properties to the sprite to help work between Cartesian
+          //and isometric properties
+          let addIsoProperties = (s, x, y, width, height) => {
+            //Cartisian (flat 2D) properties
+            s.cartX = x;
+            s.cartY = y;
+            s.cartWidth = width;
+            s.cartHeight = height;
+
+            //Add a getter/setter for the isometric properties
+            Object.defineProperties(s, {
+              isoX: {
+                get() {return this.cartX - this.cartY;},
+                enumerable: true, configurable: true
+              },
+              isoY: {
+                get() {return (this.cartX + this.cartY) / 2;},
+                enumerable: true, configurable: true
+              },
+            });
+          };
+          
+          addIsoProperties(tileSprite, mapX, mapY, world.cartTilewidth, world.cartTileheight);
+
+          //Use the isometric position to add the sprite to the world
+          tileSprite.x = tileSprite.isoX;
+          tileSprite.y = tileSprite.isoY;
+          tileSprite.z = z;
+
+          //Make a record of the sprite's index number in the array
+          //(We'll use this for collision detection later)
+          tileSprite.index = index;
+
+          //Make a record of the sprite's `gid` on the tileset.
+          //This will also be useful for collision detection
+          tileSprite.gid = gid;
+          
+          //Add the sprite to the current layer group
+          layerGroup.addChild(tileSprite);
+        }
+      });
+    }
+
+    //Is this later an `objectgroup`?
+    if (tiledLayer.type === "objectgroup") { 
+      tiledLayer.objects.forEach((object) => {
+        //We're just going to capturei the object's properties
+        //so that we can decide what to do with it later
+        //Translate `opacity` to `alpha`
+        object.alpha = object.opacity;
+        //object.z = z;
+        //Get a reference to the layer group the object is in
+        object.group = layerGroup;
+        //Push the object into the world's `objects` array
+        world.objects.push(object);
+      });
+    }
+    //Add 1 to the z index (the first layer will have a z index of `1`)
+    z += 1;
+  });
+
+  //Search functions
+  //`world.getObject` and `world.getObjects`  search for and return
+  //any sprites or objects in the `world.objects` array. 
+  //Any object that has a `name` propery in 
+  //Tiled Editor will show up in a search.
+  //`getObject` gives you a single object, `getObjects` gives an array
+  //of objects.
+  //`getObject` returns itself, so you 
+  //can use this format to directly access single object:
+  //sprite.x = world.getObject("anySprite").x;
+  //sprite.y = world.getObject("anySprite").y;
+
+  world.getObject = function (objectName) {
+    this.searchForObject = () => {
+      let foundObject;
+      world.objects.some((object) => {
+        if (object.name && object.name === objectName) {
+          foundObject = object;
+          return true;
+        }
+      });
+      if (foundObject) {
+        return foundObject;
+      } else {
+        console.log(`There is no object with the property name: ${objectName}`);
+      }
+    };
+    return this.searchForObject();
+  };
+
+  world.getObjects = function (...objectNames) {
+    let foundObjects = [];
+    world.objects.forEach((object) => {
+      if (object.name && objectNames.indexOf(object.name) !== -1) {
+        foundObjects.push(object);
+      }
+    });
+    if (foundObjects.length > 0) {
+      return foundObjects;
+    } else {
+      console.log(`I could not find those objects`);
+    }
+    return foundObjects;
+  };
+
+  //Isometric collision and depth functions
+  //The `getIndex` helper function
+  //converts a sprite's x and y position to an array index number.
+  //It returns a single index value that tells you the map array
+  //index number that the sprite is in
+  world.getIndex = (x, y, tilewidth, tileheight, mapWidthInTiles) => {
+    let index = {};
+    //Convert pixel coordinates to map index coordinates
+    index.x = Math.floor(x / tilewidth);
+    index.y = Math.floor(y / tileheight);
+    //Return the index number
+    return index.x + (index.y * mapWidthInTiles);
+  };
+
+  //The `getPoints` function takes a sprite and returns
+  //and object that tells you what all its corner points are
+  //For isometric maps, make sure you use half of the sprite's `width`
+  world.getPoints = (s) => {
+    return {
+      topLeft: {x: s.cartX, y: s.cartY},
+      topRight: {x: s.cartX + (s.cartWidth) - 1, y: s.cartY},
+      bottomLeft: {x: s.cartX, y: s.cartY + s.cartHeight - 1},
+      bottomRight: {x: s.cartX + (s.cartWidth) - 1, y: s.cartY + s.cartHeight - 1}
+    }; 
+  }
+
+  //`hitTestTile` function
+  world.hitTestTile = (sprite, mapArray, collisionGid, world, pointsToCheck = "some") => {
+    //The collision object that will be returned by this functon
+    let collision = {}; 
+
+    //Which points do you want to check?
+    //"every", "some" or "center"?
+    switch (pointsToCheck) {
+      case "center":
+        //`hit` will be true only if the center point is touching 
+        let ca = sprite.collisionArea,
+            point = {},
+            s = sprite;
+        if (sprite.collisionArea !== undefined) {
+          point = {
+            center: {
+              x: s.cartX + ca.x + (ca.width / 2),
+              y: s.cartY + ca.y + (ca.height / 2)
+            }
+          };
+        } else {
+          point = {center: {x: sprite.centerX, y: sprite.centerY}};
+        }
+        sprite.collisionPoints = point;
+        collision.hit = Object.keys(sprite.collisionPoints).some(checkPoints);
+        break;
+      case "every":
+        //`hit` will be true if every point is touching
+        sprite.collisionPoints = world.getPoints(sprite); 
+        collision.hit = Object.keys(sprite.collisionPoints).every(checkPoints);
+        break;
+      case "some":
+        //`hit` will be true only if some points are touching
+        sprite.collisionPoints = world.getPoints(sprite); 
+        collision.hit = Object.keys(sprite.collisionPoints).some(checkPoints);
+        break;
+    }
+
+    //Loop through the sprite's corner points to find out if they are inside 
+    //an array cell that you're interested in. Return `true` if they are
+    
+    function checkPoints (key) {
+      //Get a reference to the current point to check. 
+      //(`topLeft`, `topRight`, `bottomLeft` or `bottomRight` )
+      let point = sprite.collisionPoints[key];
+
+      //Find the point's index number in the map array
+      collision.index = world.getIndex(
+        point.x, point.y, 
+        world.cartTilewidth, world.cartTileheight, world.widthInTiles
+      );
+
+      //Find out what the gid value is in the map position
+      //that the point is currently over
+      let currentGid = mapArray[collision.index];
+
+      //If it matches the value of the gid that we're interested, in
+      //then there's been a collision
+      if (currentGid === collisionGid) { 
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    //Return the collision object.
+    //`collision.hit` will be true if a collision is detected.
+    //`collision.index` tells you the map array index number where the
+    //collision occured
+    return collision;
+  }
+
+  
+  //Sort `byDepth` function
+  world.byDepth = (a, b) => {
+    //Calculate the depths of `a` and `b`
+    //(add `1` to `a.z` and `b.x` to avoid multiplying by 0)
+    a.depth = (a.cartX + a.cartY) * (a.z + 1);
+    b.depth = (b.cartX + b.cartY) * (b.z + 1);
+
+    //Move sprites with a lower depth to a higher position in the array
+    if (a.depth < b.depth) {
+      return -1;
+    } else if (a.depth > b.depth) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  //Return the `world` object back to the game program
+  return world;
+}
+
+export function worldCamera(world, canvas) {
+  let camera = {
+    width: canvas.width,
+    height: canvas.height,
+    x: 0,
+    y: 0,
+    get rightInnerBoundary() {
+      return this.x + (this.width / 2) + (this.width / 4);
+    },
+    get leftInnerBoundary() {
+      return this.x + (this.width / 2) - (this.width / 4);
+    },
+    get topInnerBoundary() {
+      return this.y + (this.height / 2) - (this.height / 4);
+    },
+    get bottomInnerBoundary() {
+      return this.y + (this.height / 2) + (this.height / 4);
+    },
+    follow (sprite) {
+      //Check the sprites position in relation to the inner boundary
+      if(sprite.x < this.leftInnerBoundary) {
+        //Move the camera to follow the sprite if the sprite strays outside
+        this.x = Math.floor(sprite.x - (this.width / 4));
+      }
+      if(sprite.y < this.topInnerBoundary) {
+        this.y = Math.floor(sprite.y - (this.height / 4));
+      }
+      if(sprite.x + sprite.width > this.rightInnerBoundary) {
+        this.x = Math.floor(sprite.x + sprite.width - (this.width / 4 * 3));
+      }
+      if(sprite.y + sprite.height > this.bottomInnerBoundary) {
+        this.y = Math.floor(sprite.y + sprite.height - (this.height / 4 * 3));
+      }
+      //If the camera reaches the edge of the map, stop it from moving
+      if(this.x < 0) {
+        this.x = 0;
+      }
+      if(this.y < 0) {
+        this.y = 0;
+      }
+      if(this.x + this.width > world.width) {
+        this.x = world.width - this.width;
+      }
+      if(this.y + this.height > world.height) {
+        this.y = world.height - this.height;
+      } 
+      this.updateWorldPosition();
+    },
+    centerOver (sprite) {
+      //Center the camera over a sprite
+      this.x = (sprite.x + sprite.halfWidth) - (this.width / 2);
+      this.y = (sprite.y + sprite.halfHeight) - (this.height / 2);
+      this.updateWorldPosition();
+    },
+    updateWorldPosition () {
+      //Change the position of the world if the camera's position
+      //changes
+      world.x = -this.x;
+      world.y = -this.y;
+    }
+  };
+
+  return camera;
+}
 /*
 sort functions
 --------------

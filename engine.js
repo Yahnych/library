@@ -28,7 +28,6 @@ export class Game {
     //Initialize the pointer
     this.pointer.initialize();
 
-
     //Set the game `state`
     this.state = undefined;
 
@@ -50,6 +49,7 @@ export class Game {
 
     //A Boolean to let us pause the game
     this.paused = false;
+
   }
 
   //The engine's game loop
@@ -133,7 +133,7 @@ PixiGame
 */
 
 export class PixiGame {
-  constructor(config) {
+  constructor(width, height, setupFunction, assetsToLoad, loadFunction, renderer) {
     //Copy all the imported library code into 
     //properties on this class
     Object.assign(this, utilities);
@@ -147,10 +147,28 @@ export class PixiGame {
     //Create the Pixi and renderer using the config 
     //object's `height` and `width` properties
     let dips = window.devicePixelRatio;
-    this.renderer = PIXI.autoDetectRenderer(config.width * dips, config.height * dips);
+    switch (renderer) {
+      case "auto":
+        this.renderer = PIXI.autoDetectRenderer(width * dips, height * dips);
+        break;
+
+      case "canvas":
+        this.renderer = new PIXI.CanvasRenderer(width * dips, height * dips);
+        break;
+
+      case "gl":
+        this.renderer = new PIXI.WebGLRenderer(width * dips, height * dips);
+        break;
+
+      default:
+        this.renderer = PIXI.autoDetectRenderer(width * dips, height * dips);
+    }
     this.canvas = this.renderer.view;
     document.body.appendChild(this.canvas);
 
+    //Add a border around the canvas
+    this.canvas.style.border = "1px dashed black";
+    
     //Initialize the Pixi Pointer in library/pixiDisplay
     this.pointer = new this.Pointer();
 
@@ -158,8 +176,8 @@ export class PixiGame {
     this.state = undefined;
 
     //Set the user-defined `load` and `setup` states
-    this.load = config.load || undefined;
-    this.setup = config.setup || undefined;
+    this.load = loadFunction || undefined;
+    this.setup = setupFunction || undefined;
 
     //The `setup` function is required, so throw an error if it's
     //missing
@@ -171,12 +189,12 @@ export class PixiGame {
 
     //Get the user-defined array that listed the assets 
     //that have to load
-    this.assetFilePaths = config.assets || undefined;
+    this.assetFilePaths = assetsToLoad || undefined;
 
     //A Boolean to let us pause the game
     this.paused = false;
   }
-
+    
   //The engine's game loop
   gameLoop() {
     requestAnimationFrame(this.gameLoop.bind(this), this.canvas);
@@ -223,10 +241,6 @@ export class PixiGame {
   resume() {
     this.paused = false;
   }
-}
-
-export function pixiGame(width, height, setup, assets, load) {
-  return new PixiGame({width, height, setup, assets, load});
 }
 
 

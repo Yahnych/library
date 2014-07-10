@@ -281,9 +281,11 @@ export let assets = {
               //Copy a reference of each image on the tileset into
               //this `assets` object. That means you'll be able to 
               //access each image like this: `assets["imageName"]`
-              Object.keys(file.frames).forEach((frame) => {
-                this[frame] = PIXI.TextureCache[frame];
-              });
+              if (file.frames) {
+                Object.keys(file.frames).forEach((frame) => {
+                  this[frame] = PIXI.TextureCache[frame];
+                });
+              }
 
               //Alert the load handler that the file has loaded
               loadHandler();

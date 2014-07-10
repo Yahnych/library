@@ -213,7 +213,7 @@ You can then check for key actions like this:
     if (keyboard.left.isDown) {//...}
 
 */
-
+/*
 export let keyboard = {
   initialize(config) {
     //Create new objects for each key
@@ -251,3 +251,34 @@ export let keyboard = {
     }
   }
 };
+*/
+export function keyboard(keyCode) {
+  let key = {};
+  key.code = keyCode;
+  key.isDown = false;
+  key.isUp = true;
+  //key.press = undefined;
+  //key.release = undefined;
+  key.downHandler = (event) => {
+    if (event.keyCode === key.code) {
+      if (key.isUp && key.press) key.press();
+      key.isDown = true;
+      key.isUp = false;
+    }
+  };
+  key.upHandler = (event) => {
+    if (event.keyCode === key.code) {
+      if (key.isDown && key.release) key.release();
+      key.isDown = false;
+      key.isUp = true;
+    }
+  };
+  //Attach event listeners
+  window.addEventListener(
+    "keydown", key.downHandler.bind(key), false
+  );
+  window.addEventListener(
+    "keyup", key.upHandler.bind(key), false
+  );
+  return key;
+} 
