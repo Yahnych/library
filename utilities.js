@@ -439,3 +439,79 @@ export let fade = (sprite, alpha, time) => {
   });
   tween.start();
 };
+
+
+//`worldCamera`
+export function worldCamera(world, canvas) {
+  let camera = {
+    width: canvas.width,
+    height: canvas.height,
+    _x: 0,
+    _y: 0,
+    //`x` and `y` getters/setters
+    //When you change the camera's position,
+    //they acutally reposition the world
+    get x() {
+      return this._x;
+    },
+    set x(value) {
+      this._x = value;
+      world.x = -this._x;
+    },
+    get y() {
+      return this._y;
+    },
+    set y(value) {
+      this._y = value;
+      world.y = -this._y;
+    },
+    get rightInnerBoundary() {
+      return this.x + (this.width / 2) + (this.width / 4);
+    },
+    get leftInnerBoundary() {
+      return this.x + (this.width / 2) - (this.width / 4);
+    },
+    get topInnerBoundary() {
+      return this.y + (this.height / 2) - (this.height / 4);
+    },
+    get bottomInnerBoundary() {
+      return this.y + (this.height / 2) + (this.height / 4);
+    },
+    follow (sprite) {
+      //Check the sprites position in relation to the inner boundary
+      if(sprite.x < this.leftInnerBoundary) {
+        //Move the camera to follow the sprite if the sprite strays outside
+        this.x = Math.floor(sprite.x - (this.width / 4));
+      }
+      if(sprite.y < this.topInnerBoundary) {
+        this.y = Math.floor(sprite.y - (this.height / 4));
+      }
+      if(sprite.x + sprite.width > this.rightInnerBoundary) {
+        this.x = Math.floor(sprite.x + sprite.width - (this.width / 4 * 3));
+      }
+      if(sprite.y + sprite.height > this.bottomInnerBoundary) {
+        this.y = Math.floor(sprite.y + sprite.height - (this.height / 4 * 3));
+      }
+      //If the camera reaches the edge of the map, stop it from moving
+      if(this.x < 0) {
+        this.x = 0;
+      }
+      if(this.y < 0) {
+        this.y = 0;
+      }
+      if(this.x + this.width > world.width) {
+        this.x = world.width - this.width;
+      }
+      if(this.y + this.height > world.height) {
+        this.y = world.height - this.height;
+      } 
+    },
+    centerOver (sprite) {
+      //Center the camera over a sprite
+      this.x = (sprite.x + sprite.halfWidth) - (this.width / 2);
+      this.y = (sprite.y + sprite.halfHeight) - (this.height / 2);
+    }
+  };
+
+  return camera;
+}

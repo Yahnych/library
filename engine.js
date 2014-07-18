@@ -146,7 +146,7 @@ export class PixiGame {
 
     //Create the Pixi and renderer using the config 
     //object's `height` and `width` properties
-    let dips = window.devicePixelRatio;
+    let dips = 1;//window.devicePixelRatio;
     switch (renderer) {
       case "auto":
         this.renderer = PIXI.autoDetectRenderer(width * dips, height * dips);

@@ -837,3 +837,114 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
     }
   }
 }
+
+/*
+Tile based collision functions
+*/
+
+//The `getIndex` helper function
+//converts a sprite's x and y position to an array index number.
+//It returns a single index value that tells you the map array
+//index number that the sprite is in
+function getIndex (x, y, tilewidth, tileheight, mapWidthInTiles) {
+  let index = {};
+  //Convert pixel coordinates to map index coordinates
+  index.x = Math.floor(x / tilewidth);
+  index.y = Math.floor(y / tileheight);
+  //Return the index number
+  return index.x + (index.y * mapWidthInTiles);
+};
+
+//The `getPoints` function takes a sprite and returns
+//and object that tells you what all its corner points are
+function getPoints(s) {
+  let ca = s.collisionArea;
+  if (ca !== undefined) {
+    return {
+      topLeft: {x: s.x + ca.x, y: s.y + ca.y},
+      topRight: {x: s.x + ca.x + ca.width, y: s.y + ca.y},
+      bottomLeft: {x: s.x + ca.x, y: s.y + ca.y + ca.height},
+      bottomRight: {x: s.x + ca.x + ca.width, y: s.y + ca.y + ca.height}
+    }; 
+  } else {
+    return {
+      topLeft: {x: s.x, y: s.y},
+      topRight: {x: s.x + s.width - 1, y: s.y},
+      bottomLeft: {x: s.x, y: s.y + s.height - 1},
+      bottomRight: {x: s.x + s.width - 1, y: s.y + s.height - 1}
+    }; 
+  }
+}
+
+//`hitTestTile` function
+function hitTestTile(sprite, mapArray, collisionGid, world, pointsToCheck = "some") {
+  //The collision object that will be returned by this functon
+  let collision = {}; 
+
+  //Which points do you want to check?
+  //"every", "some" or "center"?
+  switch (pointsToCheck) {
+    case "center":
+      //`hit` will be true only if the center point is touching 
+      let ca = sprite.collisionArea,
+          point = {},
+          s = sprite;
+      if (sprite.collisionArea !== undefined) {
+        point = {
+          center: {
+            x: s.x + ca.x + (ca.width / 2),
+            y: s.y + ca.y + (ca.height / 2)
+          }
+        };
+      } else {
+        point = {center: {x: sprite.centerX, y: sprite.centerY}};
+      }
+      sprite.collisionPoints = point;
+      collision.hit = Object.keys(sprite.collisionPoints).some(checkPoints);
+      break;
+    case "every":
+      //`hit` will be true if every point is touching
+      sprite.collisionPoints = getPoints(sprite); 
+      collision.hit = Object.keys(sprite.collisionPoints).every(checkPoints);
+      break;
+    case "some":
+      //`hit` will be true only if some points are touching
+      sprite.collisionPoints = getPoints(sprite); 
+      collision.hit = Object.keys(sprite.collisionPoints).some(checkPoints);
+      break;
+  }
+
+  //Loop through the sprite's corner points to find out if they are inside 
+  //an array cell that you're interested in. Return `true` if they are
+  
+  function checkPoints(key) {
+    //Get a reference to the current point to check. 
+    //(`topLeft`, `topRight`, `bottomLeft` or `bottomRight` )
+    let point = sprite.collisionPoints[key];
+
+    //Find the point's index number in the map array
+    collision.index = getIndex(
+      point.x, point.y, 
+      world.tilewidth, world.tileheight, world.widthInTiles
+    );
+
+    //Find out what the gid value is in the map position
+    //that the point is currently over
+    let currentGid = mapArray[collision.index];
+
+    //If it matches the value of the gid that we're interested, in
+    //then there's been a collision
+    if (currentGid === collisionGid) { 
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  //Return the collision object.
+  //`collision.hit` will be true if a collision is detected.
+  //`collision.index` tells you the map array index number where the
+  //collision occured
+  return collision;
+}
+

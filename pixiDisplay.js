@@ -1452,69 +1452,120 @@ export function makeIsoTiledWorld(tiledMap, tileset) {
   return world;
 }
 
-export function worldCamera(world, canvas) {
-  let camera = {
-    width: canvas.width,
-    height: canvas.height,
-    x: 0,
-    y: 0,
-    get rightInnerBoundary() {
-      return this.x + (this.width / 2) + (this.width / 4);
-    },
-    get leftInnerBoundary() {
-      return this.x + (this.width / 2) - (this.width / 4);
-    },
-    get topInnerBoundary() {
-      return this.y + (this.height / 2) - (this.height / 4);
-    },
-    get bottomInnerBoundary() {
-      return this.y + (this.height / 2) + (this.height / 4);
-    },
-    follow (sprite) {
-      //Check the sprites position in relation to the inner boundary
-      if(sprite.x < this.leftInnerBoundary) {
-        //Move the camera to follow the sprite if the sprite strays outside
-        this.x = Math.floor(sprite.x - (this.width / 4));
-      }
-      if(sprite.y < this.topInnerBoundary) {
-        this.y = Math.floor(sprite.y - (this.height / 4));
-      }
-      if(sprite.x + sprite.width > this.rightInnerBoundary) {
-        this.x = Math.floor(sprite.x + sprite.width - (this.width / 4 * 3));
-      }
-      if(sprite.y + sprite.height > this.bottomInnerBoundary) {
-        this.y = Math.floor(sprite.y + sprite.height - (this.height / 4 * 3));
-      }
-      //If the camera reaches the edge of the map, stop it from moving
-      if(this.x < 0) {
-        this.x = 0;
-      }
-      if(this.y < 0) {
-        this.y = 0;
-      }
-      if(this.x + this.width > world.width) {
-        this.x = world.width - this.width;
-      }
-      if(this.y + this.height > world.height) {
-        this.y = world.height - this.height;
-      } 
-      this.updateWorldPosition();
-    },
-    centerOver (sprite) {
-      //Center the camera over a sprite
-      this.x = (sprite.x + sprite.halfWidth) - (this.width / 2);
-      this.y = (sprite.y + sprite.halfHeight) - (this.height / 2);
-      this.updateWorldPosition();
-    },
-    updateWorldPosition () {
-      //Change the position of the world if the camera's position
-      //changes
-      world.x = -this.x;
-      world.y = -this.y;
+export function filmStrip(texture, frameWidth, frameHeight, spacing = 0) {
+
+  let positions = [], 
+      //Find the width and height of the texture
+      textureWidth = PIXI.TextureCache[texture].width, 
+      textureHeight = PIXI.TextureCache[texture].height, 
+      //Find out how many columns and rows there are
+      columns = textureWidth / frameWidth,
+      rows = textureHeight / frameHeight,
+      //Find the total number of frames
+      numberOfFrames = columns * rows;    
+
+  for(let i = 0; i < numberOfFrames; i++) {
+    //Find the correct row and column for each frame
+    //and figure out its x and y position
+    let x = (i % columns) * frameWidth,
+        y = Math.floor(i / columns) * frameHeight;
+
+    //Compensate for any optional spacing (padding) around the tiles if
+    //there is any. This bit of code accumlates the spacing offsets from the 
+    //left side of the tileset and adds them to the current tile's position 
+    if (spacing > 0) {
+      x += spacing + (spacing * i % columns); 
+      y += spacing + (spacing * Math.floor(i / columns));
     }
+
+    //Add the x and y value of each frame to the `positions` array
+    positions.push([x, y]);
+  }
+  //Return the frames
+  return g.frames(texture, positions, frameWidth, frameHeight);
+};
+
+//The addStatePlayer function
+export function addStatePlayer(sprite) {
+  //Make sure the sprite is a Pixi MovieClip
+  if (!(sprite instanceof PIXI.MovieClip)) {
+    throw new Error("You can only animate PIXI.MovieClip sprites");
+    return;
+  }
+  
+  //Intialize the variables
+  let frameCounter = 0,
+      numberOfFrames = 0,
+      startFrame = 0,
+      endFrame = 0,
+      timerInterval = undefined,
+      playing = false;
+  
+  //The `show` function (to display static states)
+  function show(frameNumber) {
+    //Reset any possible previous animations
+    reset();
+    //Find the new state on the sprite 
+    sprite.gotoAndStop(frameNumber);
   };
 
-  return camera;
+  //The `playSequence` function, to play a sequence of frames
+  function playSequence(sequenceArray) {
+    //Reset any possible previous animations
+    reset();
+    //Figure out how many frames there are in the range
+    startFrame = sequenceArray[0];
+    endFrame = sequenceArray[1];
+    numberOfFrames = endFrame - startFrame;
+    //Calculate the frame rate. Set a default fps of 12
+    if (!sprite.fps) sprite.fps = 12;
+    let frameRate = 1000 / sprite.fps;
+    //Set the sprite to the starting frame
+    sprite.gotoAndStop(startFrame);
+    //If the state isn't already playing, start it
+    if(!playing) {
+      timerInterval = setInterval(advanceFrame.bind(this), frameRate);
+      playing = true;
+    }
+  };
+  
+  //`advanceFrame` is called by `setInterval` to dislay the next frame
+  //in the sequence based on the `frameRate`. When frame sequence
+  //reaches the end, it will either stop it or loop it.
+  function advanceFrame() {
+    //Advance the frame if `frameCounter` is less than 
+    //the state's total frames
+    if (frameCounter < numberOfFrames) {
+      //Advance the frame
+      sprite.gotoAndStop(sprite.currentFrame + 1);
+      //Update the frame counter
+      frameCounter += 1;
+    } else {
+      //If we've reached the last frame and `loop`
+      //is `true`, then start from the first frame again
+      if (sprite.loop) {
+        sprite.gotoAndStop(startFrame);
+        frameCounter = 1;
+      }
+    }
+  }
+  
+  function reset() {
+    //Reset `playing` to `false`, set the `frameCounter` to 0,
+    //and clear the `timerInterval`
+    if (timerInterval !== undefined && playing === true) {
+      playing = false;
+      frameCounter = 0;
+      startFrame = 0;
+      endFrame = 0;
+      numberOfFrames = 0;
+      clearInterval(timerInterval);
+    }
+  }
+
+  //Add the `show` and `playSequence` methods to the sprite
+  sprite.show = show;
+  sprite.playSequence = playSequence;
 }
 /*
 sort functions
