@@ -10,10 +10,225 @@ sprite prototype objects can use this code
 */
 
 //Dependencies
+/*
 import Sound from "library/sound";
-import "library/plugins/Font.js/Font";
-import {TWEEN} from "library/plugins/Tween";
+*/
 
+/*
+assets
+------
+
+This is an object to help you load and use game assets, like images, fonts and sounds,
+and texture atlases. 
+Here's how to use to load an image, a font and a texture atlas:
+
+    assets.load([
+      "images/cat.png",
+      "fonts/puzzler.otf",
+      "images/animals.json",
+    ]).then(() => setup());
+    
+When all the assets have finsihed loading, the makeSprites function
+will run. (Replace makeSprites with an other function you need).
+When you've loaded an asset, you can acccess it like this:
+
+    imageObject = assets["images/cat.png"];
+
+Access individual frames in a texture atlas using the frame's name, like this:
+
+    frame = assets["hedgehog.png"];
+
+(Just use the image name without the extension.)
+
+*/
+
+export let assets = {
+  //Properties to help track the assets being loaded
+  toLoad: 0,
+  loaded: 0,
+
+  //File extensions for different types of assets
+  imageExtensions: ["png", "jpg", "gif"],
+  fontExtensions: ["ttf", "otf", "ttc", "woff"],
+  jsonExtensions: ["json"],
+  audioExtensions: ["mp3", "ogg", "wav", "webm"],
+  
+  //The `load` method creates and loads all the assets. Use it like this:
+  //`assets.load(["images/anyImage.png", "fonts/anyFont.otf"]);`
+  load(sources) {
+    //The `load` method will return a Promise when everything has
+    //loaded
+    return new Promise(resolve => {
+      //The `loadHandler` counts the number of assets loaded, compares
+      //it to the total number of assets that need to be loaded, and
+      //resolves the Promise when everything has loaded
+      let loadHandler = () => {
+        this.loaded += 1;
+        console.log(this.loaded);
+        //Check whether everything has loaded
+        if (this.toLoad === this.loaded) {
+          //Reset `toLoad` and `loaded` to `0` so you can use them
+          //to load more assets later if you need to
+          this.toLoad = 0;
+          this.loaded = 0;      
+          console.log("Assets finished loading");
+          //Resolve the promise
+          resolve();
+        }
+      };
+
+      //Display a console message to confirm that the assets are
+      //being loaded
+      console.log("Loading assets...");
+
+      //Find the number of files that need to be loaded
+      this.toLoad = sources.length;
+
+      //Loop through all the source file names and find out how
+      //they should be interpreted
+      sources.forEach(source => {
+        //Find the file extension of the asset
+        let extension = source.split(".").pop();
+        //Load images that have file extensions that match 
+        //the imageExtensions array
+        if (this.imageExtensions.find(x => x === extension)) {
+          this.loadImage(source, loadHandler);
+        }
+        //Load fonts 
+        else if (this.fontExtensions.find(x => x === extension)) {
+          this.loadFont(source, loadHandler);
+        }
+        //Load JSON files  
+        else if (this.jsonExtensions.find(x => x === extension)) {
+          this.loadJson(source, loadHandler);
+        }
+        //Load audio files  
+        else if (this.audioExtensions.find(x => x === extension)) {
+          this.loadSound(source, loadHandler);
+        }
+        //Display a message if a file type isn't recognized
+        else {
+          console.log("File type not recognized: " + source);
+        }
+      });
+    });
+  },
+
+  loadImage(source, loadHandler) {
+    //Create a new image and call the `loadHandler` when the image
+    //file has loaded
+    let image = new Image();
+    image.addEventListener("load", loadHandler, false);
+    //Assign the image as a property of the `assets` object so
+    //you can access it like this: `assets["path/imageName.png"]`
+    this[source] = image;
+
+    //Alternatively, if you only want the file name without the full
+    //path, you can get it like this:
+    //image.name = source.split("/").pop();
+    //this[image.name] = image; 
+    //This will allow you to access the image like this:
+    //assets["imageName.png"];
+
+    //Set the image's `src` property to start loading the image
+    image.src = source;
+  },
+
+  loadFont(source, loadHandler) {
+    //Use the font's file name as the `fontFamily` name
+    let fontFamily = source.split("/").pop().split(".")[0];
+    //Append an `@afont-face` style rule to the head of the HTML
+    //document. It's kind of a hack, but until HTML5 has a
+    //proper font loading API, it will do for now
+    let newStyle = document.createElement("style");
+    let fontFace = "@font-face {font-family: '" + fontFamily + "'; src: url('" + source + "');}";
+    newStyle.appendChild(document.createTextNode(fontFace));
+    document.head.appendChild(newStyle);
+    //Tell the `loadHandler` we're loading a font
+    loadHandler();
+  },
+
+  loadJson(source, loadHandler) {
+    //Create a new `xhr` object and an object to store the file
+    let xhr = new XMLHttpRequest();
+
+    //Use xhr to load the JSON file
+    xhr.open("GET", source, true);
+    
+    //Tell xhr that it's a text file
+    xhr.responseType = "text";
+    
+    //Create an `onload` callback function that
+    //will handle the file loading    
+    xhr.onload = event => {
+      //Check to make sure the file has loaded properly
+      if (xhr.status === 200) {
+        //Convert the JSON data file into an ordinary object
+        let file = JSON.parse(xhr.responseText);
+        //Get the file name
+        file.name = source;
+        //Assign the file as a property of the assets object so
+        //you can access it like this: `assets["file.json"]`
+        this[file.name] = file;
+        //Texture atlas support:
+        //If the JSON file has a `frames` property then 
+        //it's in Texture Packer format
+        if (file.frames) {
+          //Create the tileset frames
+          this.createTilesetFrames(file, source, loadHandler);
+        } else {
+          //Alert the load handler that the file has loaded
+          loadHandler();
+        }
+      }
+    };
+    //Send the request to load the file
+    xhr.send();
+  },
+  createTilesetFrames(file, source, loadHandler) {
+    //Get the tileset image's file path
+    let baseUrl = source.replace(/[^\/]*$/, "");
+    //Here's how this regular expression works:
+    //http://stackoverflow.com/questions/7601674/id-like-to-remove-the-filename-from-a-path-using-javascript
+    
+    //Use the `baseUrl` and `image` name property from the JSON 
+    //file's `meta` object to construct the full image source path 
+    let imageSource = baseUrl + file.meta.image;
+    
+    //The image's load handler
+    let imageLoadHandler = () => {
+      //Assign the image as a property of the `assets` object so
+      //your can access it like this:
+      //`assets["images/imageName.png"]`
+      this[imageSource] = image;
+
+      //Loop through all the frames
+      Object.keys(file.frames).forEach(frame => {
+        //The `frame` object contains all the size and position
+        //data for each sub-image.
+        //Add the frame data to the asset object so that you
+        //can access it later like this: `assets["frameName.png"]`
+        this[frame] = file.frames[frame];
+
+        //Get a reference to the source so that it will be easy for
+        //us to access it later
+        this[frame].source = image;
+      });
+      
+      //Alert the load handler that the file has loaded
+      loadHandler();
+    };
+
+    //Load the tileset image
+    let image = new Image();
+    image.addEventListener("load", imageLoadHandler, false);
+    image.src = imageSource;
+  },
+
+  loadSound(source, loadHandler) {
+    console.log("loadSound called");
+  }
+};
 /*
 distance
 ----------------
@@ -144,226 +359,6 @@ export let random = (min, max) => {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
-/*
-assets
-------
-
-This is an object to help you load and use game assets, like images, fonts and sounds. 
-(To preload fonts, use Font.js). Here's how to use to load
-an image and a font:
-
-    assets.load(["images/spritesheet.png", "fonts/puzzler.otf"]);
-    assets.whenLoaded = makeSprites;
-
-When all the assets have finsihed loading, the makeSprites function
-will run. (Replace makeSprites with an other function you need).
-When you've loaded an asset, you can acccess it like this:
-
-    imageObject = assets["spritesheet.png"];
-
-(Just use the image name without the extension.)
-
-*/
-export let assets = {
-  // Properties to help track the assets being loaded
-  toLoad: 0,
-  loaded: 0,
-
-  //File extensions for different types of assets
-  imageExtensions: ["png", "jpg", "gif"],
-  fontExtensions: ["ttf", "otf", "ttc", "woff"],
-  jsonExtensions: ["json"],
-  audioExtensions: ["mp3", "ogg", "wav", "webm"],
-
-  //The callback function that should run when all assets have loaded.
-  //Assign this when you load the fonts, 
-  //like this: `assets.whenLoaded = makeSprites;`
-  whenLoaded: undefined,
-
-  //If Pixi is being used as the renderer, use Pixi's
-  //ImageLoader to add the image to the texture cache
-  pixi: true,
-
-  //The load method creates and loads all the assets. Use it like this:
-  //`assets.load(["images/anyImage.png", "fonts/anyFont.otf"]);`
-  load(sources) {
-    return new Promise((resolve) => {
-      let loadHandler = () => {
-        this.loaded += 1;
-        console.log(this.loaded);
-        //Check whether everything has loaded
-        if (this.toLoad === this.loaded) {
-          //If it has, run the callback function that was
-          //assigned to the `whenLoaded` property
-          //this.whenLoaded();
-          this.toLoad = 0;
-          this.loaded = 0;      
-          console.log("Assets finished loading");
-          //Resolve the promise
-          resolve();
-        }
-      }
-      console.log("Loading assets...");
-      //Find the number of files that need to be loaded
-      this.toLoad = sources.length;
-    
-      sources.forEach((source) => {
-        //Find the file extension of the asset
-        let extension = source.split('.').pop();
-
-        //Load images that have file extensions that match. 
-        //the imageExtensions array
-        if (this.imageExtensions.indexOf(extension) !== -1) {
-
-          //If you're using Pixi, Pixi's `ImageLoader` adds the
-          //image to the texture cache. The asset name will be a
-          //string that references the correct texture in the cache
-          if(this.pixi && PIXI) {
-            let loader = new PIXI.ImageLoader(source);
-            loader.onLoaded = () => { 
-              //Get the file name from the full source path
-              let name = source.split("/").pop();
-              //Use the file name to reference the correct texture
-              this[name] = PIXI.TextureCache[source];
-              //Alert the load handler that the image has loaded
-              //and the texture has been cached
-              loadHandler();
-            };
-            //Start loading
-            loader.load();
-
-          //If you're not using Pixi, load an image. The asset name
-          //will be an ordinary JavaScript image object
-          } else {
-            //Create a new image and add a loadHandler
-            let image = new Image();
-            //image.addEventListener("load", this.loadHandler.bind(this), false);
-            image.addEventListener("load", loadHandler.bind(this), false);
-            //Get the image file name
-            image.name = source.split("/").pop();
-            //Assign the image as a property of the assets object so
-            //we can access it like this: `assets["imageName.png"]`
-            this[image.name] = image;
-            //Set the image's src property so we can start loading the image
-            image.src = source;
-          }
-        }
-
-        //Load fonts that have file extensions that match 
-        //the fontExtensions array 
-        else if (this.fontExtensions.indexOf(extension) !== -1) {
-          //Create a new font using font.js (https://github.com/Pomax/Font.js)
-          let font = new Font();
-          //Use the font's file name as the fontFamily name
-          font.fontFamily = source.split("/").pop().split(".")[0];
-          //Set the loadHander and assign the source to start 
-          //loading the font
-          font.onload = loadHandler.bind(this);
-          font.src = source;
-        }
-
-        //Load json files that have file extensions that match 
-        //the jsonExtensions array 
-        else if (this.jsonExtensions.indexOf(extension) !== -1) {
-          //If Pixi is being used, then load the JSON file with Pixi's
-          //`JsonLoader`. It will parse Texture Packer and Spine data
-          if (this.pixi && PIXI) {
-            let loader = new PIXI.JsonLoader(source);
-            loader.onLoaded = () => { 
-              //Get access to the parsed JSON object
-              let file = loader.json;
-              //Get the file name
-              file.name = source.split("/").pop();
-              //Assign the file as a property of the assets object so
-              //we can access it like this: `assets["file.json"]`
-              this[file.name] = file;
-              
-              //Copy a reference of each image on the tileset into
-              //this `assets` object. That means you'll be able to 
-              //access each image like this: `assets["imageName"]`
-              if (file.frames) {
-                Object.keys(file.frames).forEach((frame) => {
-                  this[frame] = PIXI.TextureCache[frame];
-                });
-              }
-
-              //Alert the load handler that the file has loaded
-              loadHandler();
-            };
-            loader.load();
-          }
-          
-          //If Pixi isn't being used, load the JSON file as usual 
-          else {
-            //Create a new xhr object and an object to store the file
-            let xhr = new XMLHttpRequest();
-            let file = {};
-            //Use xhr to load the JSON file
-            xhr.open("GET", source, true);
-            xhr.addEventListener("readystatechange", () => {
-              //Check to make sure the file has loaded properly
-              if (xhr.status === 200 && xhr.readyState === 4) {
-                //Convert the JSON data file into an ordinary object
-                file = JSON.parse(xhr.responseText);
-                //Get the file name
-                file.name = source.split("/").pop();
-                //Assign the file as a property of the assets object so
-                //we can access it like this: `assets["file.json"]`
-                this[file.name] = file;
-                //Alert the load handler that the file has loaded
-                loadHandler();
-              }
-            });
-            //Send the request to load the file
-            xhr.send();
-          }
-        }
-
-        //Load audio files that have file extensions that match 
-        //the audioExtensions array 
-        else if (this.audioExtensions.indexOf(extension) !== -1) {
-          //Create a sound sprite
-          let soundSprite = new Sound({
-            source: source,
-            //loadHandler: this.loadHandler.bind(this)
-            loadHandler: loadHandler.bind(this)
-          });
-          //Get the sound file name
-          soundSprite.name = source.split("/").pop();
-          //Assign the sound as a property of the assets object so
-          //we can access it like this: `assets["sound.mp3"]`
-          this[soundSprite.name] = soundSprite;
-          console.log("Audio data loaded");
-          console.log(soundSprite.name);
-        }
-
-        //Display a message if a file type isn't recognized
-        else {
-          throw new Error("File type not recognized: " + source);
-        }
-      });
-    });
-  }
-
-  //The loadHandler will be called each time an 
-  //asset finishes loading
-  /*
-  loadHandler() {
-    this.loaded += 1;
-    console.log(this.loaded);
-    //Check whether everything has loaded
-    if (this.toLoad === this.loaded) {
-      //If it has, run the callback function that was
-      //assigned to the `whenLoaded` property
-      //this.whenLoaded();
-      this.toLoad = 0;
-      this.loaded = 0;      
-      console.log("Assets finished loading");
-      resolve();
-    }
-  }
-  */
-};
 
 /*
 Wait
@@ -440,78 +435,3 @@ export let fade = (sprite, alpha, time) => {
   tween.start();
 };
 
-
-//`worldCamera`
-export function worldCamera(world, canvas) {
-  let camera = {
-    width: canvas.width,
-    height: canvas.height,
-    _x: 0,
-    _y: 0,
-    //`x` and `y` getters/setters
-    //When you change the camera's position,
-    //they acutally reposition the world
-    get x() {
-      return this._x;
-    },
-    set x(value) {
-      this._x = value;
-      world.x = -this._x;
-    },
-    get y() {
-      return this._y;
-    },
-    set y(value) {
-      this._y = value;
-      world.y = -this._y;
-    },
-    get rightInnerBoundary() {
-      return this.x + (this.width / 2) + (this.width / 4);
-    },
-    get leftInnerBoundary() {
-      return this.x + (this.width / 2) - (this.width / 4);
-    },
-    get topInnerBoundary() {
-      return this.y + (this.height / 2) - (this.height / 4);
-    },
-    get bottomInnerBoundary() {
-      return this.y + (this.height / 2) + (this.height / 4);
-    },
-    follow (sprite) {
-      //Check the sprites position in relation to the inner boundary
-      if(sprite.x < this.leftInnerBoundary) {
-        //Move the camera to follow the sprite if the sprite strays outside
-        this.x = Math.floor(sprite.x - (this.width / 4));
-      }
-      if(sprite.y < this.topInnerBoundary) {
-        this.y = Math.floor(sprite.y - (this.height / 4));
-      }
-      if(sprite.x + sprite.width > this.rightInnerBoundary) {
-        this.x = Math.floor(sprite.x + sprite.width - (this.width / 4 * 3));
-      }
-      if(sprite.y + sprite.height > this.bottomInnerBoundary) {
-        this.y = Math.floor(sprite.y + sprite.height - (this.height / 4 * 3));
-      }
-      //If the camera reaches the edge of the map, stop it from moving
-      if(this.x < 0) {
-        this.x = 0;
-      }
-      if(this.y < 0) {
-        this.y = 0;
-      }
-      if(this.x + this.width > world.width) {
-        this.x = world.width - this.width;
-      }
-      if(this.y + this.height > world.height) {
-        this.y = world.height - this.height;
-      } 
-    },
-    centerOver (sprite) {
-      //Center the camera over a sprite
-      this.x = (sprite.x + sprite.halfWidth) - (this.width / 2);
-      this.y = (sprite.y + sprite.halfHeight) - (this.height / 2);
-    }
-  };
-
-  return camera;
-}
