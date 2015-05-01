@@ -1,14 +1,12 @@
-module utilities from "library/utilities";
-module display from "library/display";
-module collision from "library/collision";
-module interactive from "library/interactive";
-module sound from "library/sound";
-module haiku from "library/haiku";
-module tween from "library/plugins/Tween";
-module pixiDisplay from "library/pixiDisplay";
+module utilities from "../library/utilities";
+module display from "../library/display";
+module collision from "../library/collision";
+module interactive from "../library/interactive";
+module sound from "../library/sound";
+module tween from "../library/tween";
 
 export class Game {
-  constructor(config) {
+  constructor(width = 256, height = 256, setup, assetsToLoad, load) {
     //Copy all the imported library code into 
     //properties on this class
     Object.assign(this, utilities);
@@ -16,83 +14,135 @@ export class Game {
     Object.assign(this, collision);
     Object.assign(this, interactive);
     Object.assign(this, sound);
-    Object.assign(this, haiku);
     Object.assign(this, tween);
 
-    //Create the canvas
-    this.canvas = this.makeCanvas({
-      width: config.width || 250,
-      height: config.height || 250,
-    });
+    //Make the canvas and initialize the stage
+    this.canvas = this.makeCanvas(width, height, "none");
+    this.canvas.style.backgroundColor = "white";
+    this.stage.width = this.canvas.width;
+    this.stage.height = this.canvas.height;
 
-    //Initialize the pointer
-    this.pointer.initialize();
+    //Make the pointer
+    this.pointer = this.makePointer(this.canvas);
+
+    //The game's scale
+    this.scale = 1;
 
     //Set the game `state`
     this.state = undefined;
 
     //Set the user-defined `load` and `setup` states
-    this.load = config.load || undefined;
-    this.setup = config.setup || undefined;
+    this.load = load;
+    this.setup = setup;
 
-    //The `setup` function is required, so throw an error if it's
-    //missing
-    if(this.setup === undefined) {
-      throw new Error(
-        "Please supply the setup function in the Game constructor"
-      );
-    }
-
-    //Get the user-defined array that listed the assets 
-    //that have to load
-    this.assetFilePaths = config.assets || undefined;
+    //Get a reference to the `assetsToLoad` array
+    this.assetsToLoad = assetsToLoad;
 
     //A Boolean to let us pause the game
     this.paused = false;
-
+    
+    //The `setup` function is required, so throw an error if it's
+    //missing
+    if (!setup) {
+      throw new Error(
+        "Please supply the setup function in the constructor"
+      );
+    }
   }
 
-  //The engine's game loop
+  //The game loop
   gameLoop() {
-    requestAnimationFrame(this.gameLoop.bind(this), this.canvas);
-    //Update the buttons
-    this.updateButtons();
-    //Update the TWEEN object
-    this.TWEEN.update();
-    //Run the current game state if it's been defined and
-    //the game isn't paused
+    requestAnimationFrame(this.gameLoop.bind(this));
+
+    //Update all the buttons
+    if (this.buttons.length > 0) {
+      this.canvas.style.cursor = "auto";
+      this.buttons.forEach(button => {
+        button.update(this.pointer, this.canvas);
+        if (button.state === "over" || button.state === "down") {
+          if(button.parent !== undefined) {
+            this.canvas.style.cursor = "pointer";
+          }
+        }
+      });
+    }
+
+    //Update all the particles
+    if (this.particles.length > 0) {
+      for(let i = this.particles.length - 1; i >= 0; i--) {
+        let particle = this.particles[i];
+        particle.update();
+      }
+    }
+
+    //Update all the tweens
+    if (this.tweens.length > 0) {
+      for(let i = this.tweens.length - 1; i >= 0; i--) {
+        let tween = this.tweens[i];
+        if (tween) tween.update();
+      }
+    }
+    
+    //Update all the shaking sprites
+    if (this.shakingSprites.length > 0) {
+      for(let i = this.shakingSprites.length - 1; i >= 0; i--) {
+        let shakingSprite = this.shakingSprites[i];
+        if (shakingSprite.updateShake) shakingSprite.updateShake();
+      }
+    }
+    
+    //Update the pointer for drag and drop
+    if (this.draggableSprites.length > 0) {
+      this.pointer.updateDragAndDrop(this.draggableSprites);
+    }
+
+    //Run the current game `state` function if it's been defined and
+    //the game isn't `paused`
     if(this.state && !this.paused) {
       this.state();
     }
+
     //Render the canvas
     this.render(this.canvas);
+
   }
 
-  //The `start` method that gets the whole engine going
+  //The `start` method that gets the whole engine going. This needs to
+  //be called by the user from the game application code, right after
+  //the engine is instantiated
   start() {
-    if (this.assetFilePaths) {
+    if (this.assetsToLoad) {
+
       //Use the supplied file paths to load the assets then run
       //the user-defined `setup` function
-      this.assets
-        .load(this.assetFilePaths)
-        .then(() => {
-          //Clear the game state for now to stop the loop
-          this.state = undefined;
-          //Call the `setup` function
-          this.setup();
-        });
+      this.assets.load(this.assetsToLoad).then(() => {
+
+        //Clear the game `state` function for now to stop the loop.
+        this.state = undefined;
+
+        //Call the `setup` function that was supplied by the user in
+        //`Game` class's constructor
+        this.setup();
+      });
+
       //While the assets are loading, set the user-defined `load`
-      //function as the game state. That will make it run in a loop
-      this.state = this.load || undefined;
+      //function as the game state. That will make it run in a loop.
+      //You can use the `load` state to create a loading progress bar
+      if (this.load) {
+        this.state = this.load;
+      }
     }
-    //If there aren't any assets to load, 
-    //just run the user-defined `setup` functions
-    else {  
+
+    //If there aren't any assets to load,
+    //just run the user-defined `setup` function
+    else {
       this.setup();
     }
+
     //Start the game loop
     this.gameLoop();
   }
+
   //Pause and resume methods
   pause() {
     this.paused = true;
@@ -100,147 +150,89 @@ export class Game {
   resume() {
     this.paused = false;
   }
-  //Update all the buttons in the game
-  updateButtons() {
-    if (this.buttons.length > 0) {
-      this.canvas.style.cursor = "auto";
-      for(let i = 0; i < this.buttons.length; i++) {
-        let button = this.buttons[i];
-        button.update(this.pointer, this.canvas);
-        if (button.state === "over" || button.state === "down") {
-          this.canvas.style.cursor = "pointer";
-        }
+
+  //Center and scale the game engine inside the HTML page 
+  scaleToWindow(backgroundColor = "#2C3539") {
+
+    let scaleX, scaleY, scale, center;
+    
+    //1. Scale the canvas to the correct size
+    //Figure out the scale amount on each axis
+    scaleX = window.innerWidth / this.canvas.width;
+    scaleY = window.innerHeight / this.canvas.height;
+
+    //Scale the canvas based on whichever value is less: `scaleX` or `scaleY`
+    scale = Math.min(scaleX, scaleY);
+    this.canvas.style.transformOrigin = "0 0";
+    this.canvas.style.transform = "scale(" + scale + ")";
+
+    //2. Center the canvas.
+    //Decide whether to center the canvas vertically or horizontally.
+    //Wide canvases should be centered vertically, and 
+    //square or tall canvases should be centered horizontally
+
+    if (this.canvas.width > this.canvas.height) {
+      center = "vertically";
+    } else {
+      center = "horizontally";
+    }
+    
+    //Center horizontally (for square or tall canvases)
+    if (center === "horizontally") {
+      let margin = (window.innerWidth - this.canvas.width * scaleY) / 2;
+      this.canvas.style.marginLeft = margin + "px";
+      this.canvas.style.marginRight = margin + "px";
+    }
+
+    //Center vertically (for wide canvases) 
+    if (center === "vertically") {
+      let margin = (window.innerHeight - this.canvas.height * scaleX) / 2;
+      this.canvas.style.marginTop = margin + "px";
+      this.canvas.style.marginBottom = margin + "px";
+    }
+
+    //3. Remove any padding from the canvas and set the canvas
+    //display style to "block"
+    this.canvas.style.paddingLeft = 0;
+    this.canvas.style.paddingRight = 0;
+    this.canvas.style.display = "block";
+    
+    //4. Set the color of the HTML body background
+    document.body.style.backgroundColor = backgroundColor;
+    
+    //5. Set the game engine and pointer to the correct scale. 
+    //This is important for correct hit testing between the pointer and sprites
+    this.pointer.scale = scale;
+    this.scale = scale;
+
+    //Fix some quirkiness in scaling for Safari
+    /*
+    let ua = navigator.userAgent.toLowerCase(); 
+    if (ua.indexOf('safari') != -1) { 
+      if (ua.indexOf('chrome') > -1) {
+        // Chrome
+      } else {
+        // Safari
+        this.canvas.style.maxHeight = "100%";
+        this.canvas.style.minHeight = "100%";
       }
     }
+    */
   }
 }
 
 /*
 game
 ----
-A Haiku API convenience function for creating new Game object
-(This is not in the `haiku.js` file so that it avoids 
-//a circular dependancy)
+A high level wrapper for creating a game
 */
 
-export function game(width, height, setup, assets, load) {
-  return new Game({width, height, setup, assets, load});
+export function game(
+  width = 256, height = 256,
+  setup, assetsToLoad, load
+) {
+  return new Game(width, height, setup, assetsToLoad, load);
 }
 
-/*
-PixiGame
---------
-*/
-
-export class PixiGame {
-  constructor(width, height, setupFunction, assetsToLoad, loadFunction, renderer) {
-    //Copy all the imported library code into 
-    //properties on this class
-    Object.assign(this, utilities);
-    Object.assign(this, collision);
-    Object.assign(this, interactive);
-    Object.assign(this, sound);
-    Object.assign(this, tween);
-    //Replace the `display` module with `pixiDisplay`
-    Object.assign(this, pixiDisplay);
-
-    //Create the Pixi and renderer using the config 
-    //object's `height` and `width` properties
-    let dips = 1;//window.devicePixelRatio;
-    switch (renderer) {
-      case "auto":
-        this.renderer = PIXI.autoDetectRenderer(width * dips, height * dips);
-        break;
-
-      case "canvas":
-        this.renderer = new PIXI.CanvasRenderer(width * dips, height * dips);
-        break;
-
-      case "gl":
-        this.renderer = new PIXI.WebGLRenderer(width * dips, height * dips);
-        break;
-
-      default:
-        this.renderer = PIXI.autoDetectRenderer(width * dips, height * dips);
-    }
-    this.canvas = this.renderer.view;
-    document.body.appendChild(this.canvas);
-
-    //Add a border around the canvas
-    this.canvas.style.border = "1px dashed black";
-    
-    //Initialize the Pixi Pointer in library/pixiDisplay
-    this.pointer = new this.Pointer();
-
-    //Set the game `state`
-    this.state = undefined;
-
-    //Set the user-defined `load` and `setup` states
-    this.load = loadFunction || undefined;
-    this.setup = setupFunction || undefined;
-
-    //The `setup` function is required, so throw an error if it's
-    //missing
-    if(this.setup === undefined) {
-      throw new Error(
-        "Please supply the setup function in the constructor"
-      );
-    }
-
-    //Get the user-defined array that listed the assets 
-    //that have to load
-    this.assetFilePaths = assetsToLoad || undefined;
-
-    //A Boolean to let us pause the game
-    this.paused = false;
-  }
-    
-  //The engine's game loop
-  gameLoop() {
-    requestAnimationFrame(this.gameLoop.bind(this), this.canvas);
-    //Update the TWEEN object
-    this.TWEEN.update();
-    //Run the current game state if it's been defined and
-    //the game isn't paused
-    if(this.state && !this.paused) {
-      this.state();
-    }
-    //Render the canvas
-    this.renderer.render(this.stage);
-  }
-
-  //The `start` method that gets the whole engine going
-  start() {
-    if (this.assetFilePaths) {
-      //Use the supplied file paths to load the assets then run
-      //the user-defined `setup` function
-      this.assets
-        .load(this.assetFilePaths)
-        .then(() => {
-          //Clear the game state for now to stop the loop
-          this.state = undefined;
-          //Call the `setup` function
-          this.setup();
-        });
-      //While the assets are loading, set the user-defined `load`
-      //function as the game state. That will make it run in a loop
-      this.state = this.load || undefined;
-    }
-    //If there aren't any assets to load, 
-    //just run the user-defined `setup` functions
-    else {  
-      this.setup();
-    }
-    //Start the game loop
-    this.gameLoop();
-  }
-  //Pause and resume methods
-  pause() {
-    this.paused = true;
-  }
-  resume() {
-    this.paused = false;
-  }
-}
 
 

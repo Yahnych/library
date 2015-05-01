@@ -41,14 +41,15 @@ hitTestPoint
 Use it to find out if a point is touching a circlular or rectangular sprite.
 Parameters: 
 a. An object with `x` and `y` properties.
-b. A sprite object with `x`, `y`, `center.x` and `center.y` properties.
+b. A sprite object with `x`, `y`, `centerX` and `centerY` properties.
 If the sprite has a `radius` property, the function will interpret
 the shape as a circle.
 */
 
-export function hitTestPoint(point, sprite) {
+export
+function hitTestPoint(point, sprite) {
 
-  let shape, left, right, top, bottom, v, magnitude, hit;
+  let shape, left, right, top, bottom, vx, vy, magnitude, hit;
 
   //Find out if the sprite is rectangular or circular depending
   //on whether it has a `radius` property
@@ -60,7 +61,7 @@ export function hitTestPoint(point, sprite) {
 
   //Rectangle
   if (shape === "rectangle") {
-    //Get the postion of the sprite's edges
+    //Get the position of the sprite's edges
     left = sprite.x;
     right = sprite.x + sprite.width;
     top = sprite.y;
@@ -74,19 +75,19 @@ export function hitTestPoint(point, sprite) {
   if (shape === "circle") {
     //Find the distance between the point and the
     //center of the circle
-    v = {
-      x: point.x - sprite.center.x,
-      y: point.y - sprite.center.y
-    }
-    magnitude = Math.sqrt(vx * vx + v.y * v.y);
+    vx = point.x - sprite.centerX,
+    vy = point.y - sprite.centerY,
+    magnitude = Math.sqrt(vx * vx + vy * vy);
 
     //The point is intersecting the circle if the magnitude
     //(distance) is less than the circle's radius
     hit = magnitude < sprite.radius;
   }
 
+  //`hit` will be either `true` or `false`
   return hit;
 }
+
 
 /*
 hitTestCircle
@@ -94,32 +95,40 @@ hitTestCircle
 
 Use it to find out if two circular sprites are touching.
 Parameters: 
-a. A sprite object with `center.x`, `center.y` and `radius` properties.
-b. A sprite object with `center.x`, `center.y` and `radius`.
+a. A sprite object with `centerX`, `centerY` and `radius` properties.
+b. A sprite object with `centerX`, `centerY` and `radius`.
 */
 
-export function hitTestCircle(c1, c2) {
-  let v, magnitude, totalRadii, hit;
+export
+function hitTestCircle(c1, c2, global = false) {
+  let vx, vy, magnitude, combinedRadii, hit;
 
   //Calculate the vector between the circles’ center points
-  v = {
-    x: c1.center.x - c2.center.x,
-    y: c1.center.y - c2.center.y
-  };
+  if (global) {
+    //Use global coordinates
+    vx = (c2.gx + c2.radius) - (c1.gx + c1.radius);
+    vy = (c2.gy + c2.radius) - (c1.gy + c1.radius);
+  } else {
+    //Use local coordinates
+    vx = c2.centerX - c1.centerX;
+    vy = c2.centerY - c1.centerY;
+  }
 
   //Find the distance between the circles by calculating
-  //the vector's magnitude (how long the vector is)  
-  magnitude = Math.sqrt(v.x * v.x + v.y * v.y);
+  //the vector's magnitude (how long the vector is)
+  magnitude = Math.sqrt(vx * vx + vy * vy);
 
   //Add together the circles' total radii
-  totalRadii = c1.radius + c2.radius;
+  combinedRadii = c1.radius + c2.radius;
 
-  //Set hit to true if the distance between the circles is
-  //less than their totalRadii
-  hit = magnitude < totalRadii;
+  //Set `hit` to `true` if the distance between the circles is
+  //less than their `combinedRadii`
+  hit = magnitude < combinedRadii;
 
+  //`hit` will be either `true` or `false`
   return hit;
-}
+};
+
 
 /*
 circleCollision
@@ -128,26 +137,36 @@ circleCollision
 Use it to prevent a moving circular sprite from overlapping and optionally
 bouncing off a non-moving circular sprite.
 Parameters: 
-a. A sprite object with `p.x`, `p.y` `center.x`, `center.y` and `radius` properties.
-b. A sprite object with `p.x`, `p.y` `center.x`, `center.y` and `radius` properties.
+a. A sprite object with `x`, `y` `centerX`, `centerY` and `radius` properties.
+b. A sprite object with `x`, `y` `centerX`, `centerY` and `radius` properties.
 c. Optional: true or false to indicate whether or not the first sprite
 should bounce off the second sprite.
 The sprites can contain an optional mass property that should be greater than 1.
 
 */
 
-export function circleCollision(c1, c2, bounce = true) {
+export
+function circleCollision(c1, c2, bounce = false, global = false) {
+
   let magnitude, combinedRadii, overlap,
-      v = {}, d = {}, s = {},
-      hit = false;
+    vx, vy, dx, dy, s = {},
+    hit = false;
 
   //Calculate the vector between the circles’ center points
-  v.x = c2.center.x - c1.center.x;
-  v.y = c2.center.y - c1.center.y;
+
+  if (global) {
+    //Use global coordinates
+    vx = (c2.gx + c2.radius) - (c1.gx + c1.radius);
+    vy = (c2.gy + c2.radius) - (c1.gy + c1.radius);
+  } else {
+    //Use local coordinates
+    vx = c2.centerX - c1.centerX;
+    vy = c2.centerY - c1.centerY;
+  }
 
   //Find the distance between the circles by calculating
-  //the vector's magnitude (how long the vector is) 
-  magnitude = Math.sqrt(v.x * v.x + v.y * v.y);
+  //the vector's magnitude (how long the vector is)
+  magnitude = Math.sqrt(vx * vx + vy * vy);
 
   //Add together the circles' combined half-widths
   combinedRadii = c1.radius + c2.radius;
@@ -155,43 +174,48 @@ export function circleCollision(c1, c2, bounce = true) {
   //Figure out if there's a collision
   if (magnitude < combinedRadii) {
 
-    //Yes, a collision is happening.
+    //Yes, a collision is happening
     hit = true;
 
-    //Find the amount of overlap between the circles 
+    //Find the amount of overlap between the circles
     overlap = combinedRadii - magnitude;
 
-    //Normalize the vector.
+    //Add some "quantum padding". This adds a tiny amount of space
+    //between the circles to reduce their surface tension and make
+    //them more slippery. "0.3" is a good place to start but you might
+    //need to modify this slightly depending on the exact behaviour
+    //you want. Too little and the balls will feel sticky, too much
+    //and they could start to jitter if they're jammed together
+    let quantumPadding = 0.3;
+    overlap += quantumPadding;
+
+    //Normalize the vector
     //These numbers tell us the direction of the collision
-    d.x = v.x / magnitude;
-    d.y = v.y / magnitude;
+    dx = vx / magnitude;
+    dy = vy / magnitude;
 
     //Move circle 1 out of the collision by multiplying
-    //the overlap with the normalized vector and subtract it from 
+    //the overlap with the normalized vector and subtract it from
     //circle 1's position
-    c1.x -= overlap * d.x;
-    c1.y -= overlap * d.y;
+    c1.x -= overlap * dx;
+    c1.y -= overlap * dy;
 
-    //Bounce    
+    //Bounce
     if (bounce) {
-      //Create a collision vector object, `s` to represent the bounce surface.
+      //Create a collision vector object, `s` to represent the bounce "surface".
       //Find the bounce surface's x and y properties
       //(This represents the normal of the distance vector between the circles)
-      s.x = v.y;
-      s.y = -v.x;
+      s.x = vy;
+      s.y = -vx;
 
       //Bounce c1 off the surface
       bounceOffSurface(c1, s);
-    } else {
-      //Make it a bit slippery
-      let friction = 0.9;
-      c1.vx *= friction;
-      c1.vy *= friction;
     }
   }
-
   return hit;
 }
+
+
 
 /*
 movingCircleCollision
@@ -199,32 +223,42 @@ movingCircleCollision
 
 Use it to make two moving circles bounce off each other.
 Parameters: 
-a. A sprite object with `x`, `y` `center.x`, `center.y` and `radius` properties.
-b. A sprite object with `x`, `y` `center.x`, `center.y` and `radius` properties.
+a. A sprite object with `x`, `y` `centerX`, `centerY` and `radius` properties.
+b. A sprite object with `x`, `y` `centerX`, `centerY` and `radius` properties.
 The sprites can contain an optional mass property that should be greater than 1.
 
 */
 
-export function movingCircleCollision(c1, c2) {
-  let combinedRadii, overlap, xSide, ySide,
-      s = {
-        v: {},
-        d: {},
-        l: {}
-      },
-      p1A = {}, p1B = {}, p2A = {}, p2B = {},
-      hit = false;
+export
+function movingCircleCollision(c1, c2, global = false) {
 
+  let combinedRadii, overlap, xSide, ySide,
+    //`s` refers to the distance vector between the circles
+    s = {},
+    p1A = {},
+    p1B = {},
+    p2A = {},
+    p2B = {},
+    hit = false;
+
+  //Apply mass, if the circles have mass properties
   c1.mass = c1.mass || 1;
   c2.mass = c2.mass || 1;
 
   //Calculate the vector between the circles’ center points
-  s.v.x = c1.center.x - c2.center.x;
-  s.v.y = c1.center.y - c2.center.y;
+  if (global) {
+    //Use global coordinates
+    s.vx = (c2.gx + c2.radius) - (c1.gx + c1.radius);
+    s.vy = (c2.gy + c2.radius) - (c1.gy + c1.radius);
+  } else {
+    //Use local coordinates
+    s.vx = c2.centerX - c1.centerX;
+    s.vy = c2.centerY - c1.centerY;
+  }
 
   //Find the distance between the circles by calculating
-  //the vector's magnitude (how long the vector is) 
-  s.magnitude = Math.sqrt(s.v.x * s.v.x + s.v.y * s.v.y);
+  //the vector's magnitude (how long the vector is)
+  s.magnitude = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
 
   //Add together the circles' combined half-widths
   combinedRadii = c1.radius + c2.radius;
@@ -235,72 +269,76 @@ export function movingCircleCollision(c1, c2) {
     //Yes, a collision is happening
     hit = true;
 
-    //Find the amount of overlap between the circles 
+    //Find the amount of overlap between the circles
     overlap = combinedRadii - s.magnitude;
+
+    //Add some "quantum padding" to the overlap
+    overlap += 0.3;
 
     //Normalize the vector.
     //These numbers tell us the direction of the collision
-    s.d.x = s.v.x / s.magnitude;
-    s.d.y = s.v.y / s.magnitude;
+    s.dx = s.vx / s.magnitude;
+    s.dy = s.vy / s.magnitude;
 
     //Find the collision vector.
     //Divide it in half to share between the circles, and make it absolute
-    s.v.xHalf = Math.abs(s.d.x * overlap / 2);
-    s.v.yHalf = Math.abs(s.d.y * overlap / 2);
+    s.vxHalf = Math.abs(s.dx * overlap / 2);
+    s.vyHalf = Math.abs(s.dy * overlap / 2);
 
-    //Find the side that the collision if occuring on
+    //Find the side that the collision is occurring on
     (c1.x > c2.x) ? xSide = 1 : xSide = -1;
     (c1.y > c2.y) ? ySide = 1 : ySide = -1;
 
     //Move c1 out of the collision by multiplying
-    //the overlap with the normalized vector and adding it to 
-    //the circle's positions
-    c1.x = c1.x + (s.v.xHalf * xSide);
-    c1.y = c1.y + (s.v.yHalf * ySide);
+    //the overlap with the normalized vector and adding it to
+    //the circles' positions
+    c1.x = c1.x + (s.vxHalf * xSide);
+    c1.y = c1.y + (s.vyHalf * ySide);
 
     //Move c2 out of the collision
-    c2.x = c2.x + (s.v.xHalf * -xSide);
-    c2.y = c2.y + (s.v.yHalf * -ySide);
+    c2.x = c2.x + (s.vxHalf * -xSide);
+    c2.y = c2.y + (s.vyHalf * -ySide);
 
     //1. Calculate the collision surface's properties
 
     //Find the surface vector's left normal
-    s.l.x = s.v.y;
-    s.l.y = -s.v.x;
+    s.lx = s.vy;
+    s.ly = -s.vx;
 
     //2. Bounce c1 off the surface (s)
 
     //Find the dot product between c1 and the surface
-    let dp1 = c1.vx * s.d.x + c1.vy * s.d.y;
+    let dp1 = c1.vx * s.dx + c1.vy * s.dy;
 
     //Project c1's velocity onto the collision surface
-    p1A.x = dp1 * s.d.x;
-    p1A.y = dp1 * s.d.y;
+    p1A.x = dp1 * s.dx;
+    p1A.y = dp1 * s.dy;
 
-    //Find the dot product of c1 and the surface's left normal (s.l.x and s.l.y)
-    let dp2 = c1.vx * (s.l.x / s.magnitude) + c1.vy * (s.l.y / s.magnitude);
+    //Find the dot product of c1 and the surface's left normal (s.lx and s.ly)
+    let dp2 = c1.vx * (s.lx / s.magnitude) + c1.vy * (s.ly / s.magnitude);
 
     //Project the c1's velocity onto the surface's left normal
-    p1B.x = dp2 * (s.l.x / s.magnitude);
-    p1B.y = dp2 * (s.l.y / s.magnitude);
+    p1B.x = dp2 * (s.lx / s.magnitude);
+    p1B.y = dp2 * (s.ly / s.magnitude);
 
     //3. Bounce c2 off the surface (s)
 
     //Find the dot product between c2 and the surface
-    let dp3 = c2.vx * s.d.x + c2.vy * s.d.y;
+    let dp3 = c2.vx * s.dx + c2.vy * s.dy;
 
     //Project c2's velocity onto the collision surface
-    p2A.x = dp3 * s.d.x;
-    p2A.y = dp3 * s.d.y;
+    p2A.x = dp3 * s.dx;
+    p2A.y = dp3 * s.dy;
 
-    //Find the dot product of c2 and the surface's left normal (s.l.x and s.l.y)
-    let dp4 = c2.vx * (s.l.x / s.magnitude) + c2.vy * (s.l.y / s.magnitude);
+    //Find the dot product of c2 and the surface's left normal (s.lx and s.ly)
+    let dp4 = c2.vx * (s.lx / s.magnitude) + c2.vy * (s.ly / s.magnitude);
 
     //Project c2's velocity onto the surface's left normal
-    p2B.x = dp4 * (s.l.x / s.magnitude);
-    p2B.y = dp4 * (s.l.y / s.magnitude);
+    p2B.x = dp4 * (s.lx / s.magnitude);
+    p2B.y = dp4 * (s.ly / s.magnitude);
 
-    //Calculate the bounce vectors
+    //4. Calculate the bounce vectors
+
     //Bounce c1
     //using p1B and p2A
     c1.bounce = {};
@@ -324,44 +362,83 @@ export function movingCircleCollision(c1, c2) {
 }
 
 /*
+multipleCircleCollision
+-----------------------
+
+Checks all the circles in an array for a collision against
+all the other circles in an array, using `movingCircleCollision` (above)
+*/
+
+export
+function multipleCircleCollision(arrayOfCircles, global = false) {
+  //marble collisions
+  for (let i = 0; i < arrayOfCircles.length; i++) {
+    //The first marble to use in the collision check
+    var c1 = arrayOfCircles[i];
+    for (let j = i + 1; j < arrayOfCircles.length; j++) {
+      //The second marble to use in the collision check
+      let c2 = arrayOfCircles[j];
+      //Check for a collision and bounce the marbles apart if
+      //they collide. Use an optional mass property on the sprite
+      //to affect the bounciness of each marble
+      movingCircleCollision(c1, c2, global);
+    }
+  }
+}
+
+
+
+/*
 hitTestRectangle
 ----------------
 
 Use it to find out if two rectangular sprites are touching.
 Parameters: 
-a. A sprite object with `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
-b. A sprite object with `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
+a. A sprite object with `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
+b. A sprite object with `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
 
 */
 
-export function hitTestRectangle(r1, r2) {
-  let hit, combinedHalfWidths, combinedHalfHeights, v = {};
+export
+function hitTestRectangle(r1, r2, global = false) {
+  let hit, combinedHalfWidths, combinedHalfHeights, vx, vy;
+
   //A variable to determine whether there's a collision
   hit = false;
 
   //Calculate the distance vector
-  v.x = r1.center.x - r2.center.x;
-  v.y = r1.center.y - r2.center.y;
+  if (global) {
+    vx = (r1.gx + r1.halfWidth) - (r2.gx + r2.halfWidth);
+    vy = (r1.gy + r1.halfHeight) - (r2.gy + r2.halfHeight);
+  } else {
+    vx = r1.centerX - r2.centerX;
+    vy = r1.centerY - r2.centerY;
+  }
 
   //Figure out the combined half-widths and half-heights
   combinedHalfWidths = r1.halfWidth + r2.halfWidth;
   combinedHalfHeights = r1.halfHeight + r2.halfHeight;
 
   //Check for a collision on the x axis
-  if (Math.abs(v.x) < combinedHalfWidths) {
+  if (Math.abs(vx) < combinedHalfWidths) {
+
     //A collision might be occuring. Check for a collision on the y axis
-    if (Math.abs(v.y) < combinedHalfHeights) {
+    if (Math.abs(vy) < combinedHalfHeights) {
+
       //There's definitely a collision happening
       hit = true;
     } else {
+
       //There's no collision on the y axis
       hit = false;
     }
   } else {
+
     //There's no collision on the x axis
     hit = false;
   }
 
+  //`hit` will be either `true` or `false`
   return hit;
 }
 
@@ -370,98 +447,108 @@ rectangleCollision
 ------------------
 
 Use it to prevent two rectangular sprites from overlapping. 
-Optionally, make the first retangle bounceoff the second rectangle.
+Optionally, make the first rectangle bounce off the second rectangle.
 Parameters: 
-a. A sprite object with `x`, `y` `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
-b. A sprite object with `x`, `y` `center.x`, `center.y`, `halfWidth` and `halfHeight` properties.
+a. A sprite object with `x`, `y` `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
+b. A sprite object with `x`, `y` `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
 c. Optional: true or false to indicate whether or not the first sprite
 should bounce off the second sprite.
 */
 
-export function rectangleCollision(r1, r2, bounce = false) {
-  let collision, combinedHalfWidths, combinedHalfHeights,
-      overlap = {},
-      v = {};
+export
+function rectangleCollision(
+  r1, r2, bounce = false, global = true
+) {
 
-  //A variable to tell us which side the 
-  //collision is occurring on
-  let collision;
+  let collision, combinedHalfWidths, combinedHalfHeights,
+    overlapX, overlapY, vx, vy;
 
   //Calculate the distance vector
-  //v.x = r1.center.x - r2.center.x;
-  //v.y = r1.center.y - r2.center.y;
-  v.x = r1.centerX - r2.centerX;
-  v.y = r1.centerY - r2.centerY;
-  
+  if (global) {
+    vx = (r1.gx + r1.halfWidth) - (r2.gx + r2.halfWidth);
+    vy = (r1.gy + r1.halfHeight) - (r2.gy + r2.halfHeight);
+  } else {
+    vx = r1.centerX - r2.centerX;
+    vy = r1.centerY - r2.centerY;
+  }
+
   //Figure out the combined half-widths and half-heights
   combinedHalfWidths = r1.halfWidth + r2.halfWidth;
   combinedHalfHeights = r1.halfHeight + r2.halfHeight;
 
-  //Check whether vx is less than the combined half widths 
-  if (Math.abs(v.x) < combinedHalfWidths) {
-    //A collision might be occurring! 
-    //Check whether vy is less than the combined half heights 
-    if (Math.abs(v.y) < combinedHalfHeights) {
-      //A collision has occurred! This is good! 
+  //Check whether vx is less than the combined half widths
+  if (Math.abs(vx) < combinedHalfWidths) {
+
+    //A collision might be occurring!
+    //Check whether vy is less than the combined half heights
+    if (Math.abs(vy) < combinedHalfHeights) {
+
+      //A collision has occurred! This is good!
       //Find out the size of the overlap on both the X and Y axes
-      overlap.x = combinedHalfWidths - Math.abs(v.x);
-      overlap.y = combinedHalfHeights - Math.abs(v.y);
+      overlapX = combinedHalfWidths - Math.abs(vx);
+      overlapY = combinedHalfHeights - Math.abs(vy);
 
       //The collision has occurred on the axis with the
       //*smallest* amount of overlap. Let's figure out which
       //axis that is
 
-      if (overlap.x >= overlap.y) {
-        //The collision is happening on the X axis 
+      if (overlapX >= overlapY) {
+        //The collision is happening on the X axis
         //But on which side? vy can tell us
-        if (v.y > 0) {
+
+        if (vy > 0) {
           collision = "top";
           //Move the rectangle out of the collision
-          r1.y = r1.y + overlap.y;
+          r1.y = r1.y + overlapY;
         } else {
           collision = "bottom";
           //Move the rectangle out of the collision
-          r1.y = r1.y - overlap.y;
+          r1.y = r1.y - overlapY;
         }
+
         //Bounce
         if (bounce) {
           r1.vy *= -1;
 
           /*Alternative
           //Find the bounce surface's vx and vy properties
-          let s = {v:{}};
-          s.v.x = r2.x - r2.x + r2.width; 
-          s.v.y = 0;
-	
+          var s = {};
+          s.vx = r2.x - r2.x + r2.width;
+          s.vy = 0;
+
           //Bounce r1 off the surface
           //bounceOffSurface(r1, s);
           */
+
         }
       } else {
-        //The collision is happening on the Y axis 
+        //The collision is happening on the Y axis
         //But on which side? vx can tell us
-        if (v.x > 0) {
+
+        if (vx > 0) {
           collision = "left";
           //Move the rectangle out of the collision
-          r1.x = r1.x + overlap.x;
+          r1.x = r1.x + overlapX;
         } else {
           collision = "right";
           //Move the rectangle out of the collision
-          r1.x = r1.x - overlap.x;
+          r1.x = r1.x - overlapX;
         }
+
         //Bounce
         if (bounce) {
           r1.vx *= -1;
 
           /*Alternative
           //Find the bounce surface's vx and vy properties
-          let s = {v:{}};
-          s.v.x = 0; 
-          s.v.y = r2.y - r2.y + r2.height;
-		
+          var s = {};
+          s.vx = 0;
+          s.vy = r2.y - r2.y + r2.height;
+
           //Bounce r1 off the surface
           bounceOffSurface(r1, s);
           */
+
         }
       }
     } else {
@@ -471,9 +558,294 @@ export function rectangleCollision(r1, r2, bounce = false) {
     //No collision
   }
 
+  //Return the collision string. it will be either "top", "right",
+  //"bottom", or "left" depending on which side of r1 is touching r2.
   return collision;
 }
 
+/*
+hitTestCircleRectangle
+----------------
+
+Use it to find out if a circular shape is touching a rectangular shape
+Parameters: 
+a. A sprite object with `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
+b. A sprite object with `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
+
+*/
+
+export
+function hitTestCircleRectangle(c1, r1, global = false) {
+
+  let region, collision, c1x, c1y, r1x, r1y;
+
+  //Use either global or local coordinates
+  if (global) {
+    c1x = c1.gx;
+    c1y = c1.gy
+    r1x = r1.gx;
+    r1y = r1.gy;
+  } else {
+    c1x = c1.x;
+    c1y = c1.y
+    r1x = r1.x;
+    r1y = r1.y;
+  }
+
+  //Is the circle above the rectangle's top edge?
+  if (c1y < r1y - r1.halfHeight) {
+
+    //If it is, we need to check whether it's in the 
+    //top left, top center or top right
+    //(Increasing the size of the region by 2 pixels slightly weights
+    //the text in favor of a rectangle vs. rectangle collision test.
+    //This gives a more natural looking result with corner collisions
+    //when physics is added)
+    if (c1x < r1x - 1 - r1.halfWidth) {
+      region = "topLeft";
+    } else if (c1x > r1x + 1 + r1.halfWidth) {
+      region = "topRight";
+    } else {
+      region = "topMiddle";
+    }
+  }
+
+  //The circle isn't above the top edge, so it might be
+  //below the bottom edge
+  else if (c1y > r1y + r1.halfHeight) {
+
+    //If it is, we need to check whether it's in the bottom left,
+    //bottom center, or bottom right
+    if (c1x < r1x - 1 - r1.halfWidth) {
+      region = "bottomLeft";
+    } else if (c1x > r1x + 1 + r1.halfWidth) {
+      region = "bottomRight";
+    } else {
+      region = "bottomMiddle";
+    }
+  }
+
+  //The circle isn't above the top edge or below the bottom edge,
+  //so it must be on the left or right side
+  else {
+    if (c1x < r1x - r1.halfWidth) {
+      region = "leftMiddle";
+    } else {
+      region = "rightMiddle";
+    }
+  }
+
+  //Is this the circle touching the flat sides
+  //of the rectangle?
+  if (region === "topMiddle" || region === "bottomMiddle" || region === "leftMiddle" || region === "rightMiddle") {
+
+    //Yes, it is, so do a standard rectangle vs. rectangle collision test
+    collision = hitTestRectangle(c1, r1, global);
+  }
+
+  //The circle is touching one of the corners, so do a
+  //circle vs. point collision test
+  else {
+    let point = {};
+
+    switch (region) {
+      case "topLeft":
+        point.x = r1x;
+        point.y = r1y;
+        break;
+
+      case "topRight":
+        point.x = r1x + r1.width;
+        point.y = r1y;
+        break;
+
+      case "bottomLeft":
+        point.x = r1x;
+        point.y = r1y + r1.height;
+        break;
+
+      case "bottomRight":
+        point.x = r1x + r1.width;
+        point.y = r1y + r1.height;
+    }
+
+    //Check for a collision between the circle and the point
+    collision = hitTestCirclePoint(c1, point, global);
+  }
+
+  //Return the result of the collision.
+  //The return value will be `undefined` if there's no collision
+  if (collision) {
+    return region;
+  } else {
+    return collision;
+  }
+}
+
+/*
+hitTestCirclePoint
+------------------
+
+Use it to find out if a circular shape is touching a point
+Parameters: 
+a. A sprite object with `centerX`, `centerY`, and `radius` properties.
+b. A point object with `x` and `y` properties.
+
+*/
+
+export
+function hitTestCirclePoint(c1, point, global = false) {
+  //A point is just a circle with a diameter of
+  //1 pixel, so we can cheat. All we need to do is an ordinary circle vs. circle
+  //Collision test. Just supply the point with the properties
+  //it needs
+  point.diameter = 1;
+  point.radius = 0.5;
+  point.centerX = point.x;
+  point.centerY = point.y;
+  point.gx = point.x;
+  point.gy = point.y;
+  return hitTestCircle(c1, point, global);
+}
+
+/*
+circleRectangleCollision
+------------------------
+
+Use it to bounce a circular shape off a rectangular shape
+Parameters: 
+a. A sprite object with `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
+b. A sprite object with `centerX`, `centerY`, `halfWidth` and `halfHeight` properties.
+
+*/
+
+export
+function circleRectangleCollision(
+  c1, r1, bounce = false, global = false
+) {
+
+  let region, collision, c1x, c1y, r1x, r1y;
+
+  //Use either the global or local coordinates
+  if (global) {
+    c1x = c1.gx;
+    c1y = c1.gy
+    r1x = r1.gx;
+    r1y = r1.gy;
+  } else {
+    c1x = c1.x;
+    c1y = c1.y
+    r1x = r1.x;
+    r1y = r1.y;
+  }
+
+  //Is the circle above the rectangle's top edge?
+  if (c1y < r1y - r1.halfHeight) {
+    //If it is, we need to check whether it's in the 
+    //top left, top center or top right
+    if (c1x < r1x - 1 - r1.halfWidth) {
+      region = "topLeft";
+    } else if (c1x > r1x + 1 + r1.halfWidth) {
+      region = "topRight";
+    } else {
+      region = "topMiddle";
+    }
+  }
+
+  //The circle isn't above the top edge, so it might be
+  //below the bottom edge
+  else if (c1y > r1y + r1.halfHeight) {
+    //If it is, we need to check whether it's in the bottom left,
+    //bottom center, or bottom right
+    if (c1x < r1x - 1 - r1.halfWidth) {
+      region = "bottomLeft";
+    } else if (c1x > r1x + 1 + r1.halfWidth) {
+      region = "bottomRight";
+    } else {
+      region = "bottomMiddle";
+    }
+  }
+
+  //The circle isn't above the top edge or below the bottom edge,
+  //so it must be on the left or right side
+  else {
+    if (c1x < r1x - r1.halfWidth) {
+      region = "leftMiddle";
+    } else {
+      region = "rightMiddle";
+    }
+  }
+
+  //Is this the circle touching the flat sides
+  //of the rectangle?
+  if (region === "topMiddle" || region === "bottomMiddle" || region === "leftMiddle" || region === "rightMiddle") {
+
+    //Yes, it is, so do a standard rectangle vs. rectangle collision test
+    collision = rectangleCollision(c1, r1, bounce, global);
+  }
+
+  //The circle is touching one of the corners, so do a
+  //circle vs. point collision test
+  else {
+    let point = {};
+
+    switch (region) {
+      case "topLeft":
+        point.x = r1x;
+        point.y = r1y;
+        break;
+
+      case "topRight":
+        point.x = r1x + r1.width;
+        point.y = r1y;
+        break;
+
+      case "bottomLeft":
+        point.x = r1x;
+        point.y = r1y + r1.height;
+        break;
+
+      case "bottomRight":
+        point.x = r1x + r1.width;
+        point.y = r1y + r1.height;
+    }
+
+    //Check for a collision between the circle and the point
+    collision = circlePointCollision(c1, point, bounce, global);
+  }
+
+  if (collision) {
+    return region;
+  } else {
+    return collision;
+  }
+}
+
+/*
+circlePointCollision
+--------------------
+
+Use it to boucnce a circle off a point.
+Parameters: 
+a. A sprite object with `centerX`, `centerY`, and `radius` properties.
+b. A point object with `x` and `y` properties.
+
+*/
+
+export
+function circlePointCollision(c1, point, bounce = false, global = false) {
+  //A point is just a circle with a diameter of
+  //1 pixel, so we can cheat. All we need to do is an ordinary circle vs. circle
+  //Collision test. Just supply the point with the properties
+  //it needs
+  point.diameter = 1;
+  point.radius = 0.5;
+  point.centerX = point.x;
+  point.centerY = point.y;
+  point.gx = point.x;
+  point.gy = point.y;
+  return circleCollision(c1, point, bounce, global);
+}
 /*
 bounceOffSurface
 ----------------
@@ -490,228 +862,51 @@ be used to dampen the bounce effect.
 
 function bounceOffSurface(o, s) {
   let dp1, dp2,
-      p1 = {
-        v: {}
-      },
-      p2 = {
-        v: {}
-      },
-      bounce = {},
-      mass = o.mass || 1;
+    p1 = {},
+    p2 = {},
+    bounce = {},
+    mass = o.mass || 1;
 
   //1. Calculate the collision surface's properties
   //Find the surface vector's left normal
-  s.l = {};
-  s.l.x = s.y;
-  s.l.y = -s.x;
+  s.lx = s.y;
+  s.ly = -s.x;
 
   //Find its magnitude
   s.magnitude = Math.sqrt(s.x * s.x + s.y * s.y);
 
   //Find its normalized values
-  s.d = {};
-  s.d.x = s.x / s.magnitude;
-  s.d.y = s.y / s.magnitude;
+  s.dx = s.x / s.magnitude;
+  s.dy = s.y / s.magnitude;
 
   //2. Bounce the object (o) off the surface (s)
 
   //Find the dot product between the object and the surface
-  dp1 = o.vx * s.d.x + o.vy * s.d.y;
+  dp1 = o.vx * s.dx + o.vy * s.dy;
 
   //Project the object's velocity onto the collision surface
-  p1.v.x = dp1 * s.d.x;
-  p1.v.y = dp1 * s.d.y;
+  p1.vx = dp1 * s.dx;
+  p1.vy = dp1 * s.dy;
 
-  //Find the dot product of the object and the surface's left normal (s.l.x and s.l.y)
-  dp2 = o.vx * (s.l.x / s.magnitude) + o.vy * (s.l.y / s.magnitude);
+  //Find the dot product of the object and the surface's left normal (s.lx and s.ly)
+  dp2 = o.vx * (s.lx / s.magnitude) + o.vy * (s.ly / s.magnitude);
 
   //Project the object's velocity onto the surface's left normal
-  p2.v.x = dp2 * (s.l.x / s.magnitude);
-  p2.v.y = dp2 * (s.l.y / s.magnitude);
+  p2.vx = dp2 * (s.lx / s.magnitude);
+  p2.vy = dp2 * (s.ly / s.magnitude);
 
   //Reverse the projection on the surface's left normal
-  p2.v.x *= -1;
-  p2.v.y *= -1;
+  p2.vx *= -1;
+  p2.vy *= -1;
 
   //Add up the projections to create a new bounce vector
-  bounce.x = p1.v.x + p2.v.x;
-  bounce.y = p1.v.y + p2.v.y;
+  bounce.x = p1.vx + p2.vx;
+  bounce.y = p1.vy + p2.vy;
 
   //Assign the bounce vector to the object's velocity
   //with optional mass to dampen the effect
   o.vx = bounce.x / mass;
   o.vy = bounce.y / mass;
-}
-
-/*
-hitTestTile
-------------------
-
-Check for a collision between a sprite and a gid number in a tile map array.
-Here’s how to use it:
-
-    let collision = hitTestTile({
-      sprite: anySprite,
-      tileToFind: gidNumber,
-      array: anyMapArray,
-      pointsToCheck: “”,//A string: "center", "some" or "every"
-      mapWidth: theMapWidth,
-      tileWidth: theMapTileWidth,
-      tileHeight: theMapTileHieght
-    });
-    
-hitTestTile returns a collision object that contains these two properties:
-
-  - collision.hit: A Boolean value that will be true if a collision occurred.
-  - collision.index: a number that tells you the collision’s map array location
-
-*/
-
-export function hitTestTile(config) {
-  //The variables we'll need
-  let sprite = config.sprite,
-      tileToFind = config.tileToFind,
-      array = config.array,
-      pointsToCheck = config.pointsToCheck || "some",
-      mapWidth = config.mapWidth,
-      tileWidth = config.tileWidth,
-      tileHeight = config.tileHeight,
-      points = {};
-
-  //A collision object that will be returned by this function.
-  //`collision.hit` will be true or false depending on whether a collision is detected.
-  //`collision.index` will contain the map array index where the collision happened
-  let collision = {};
-  collision.hit = false;
-  collision.index = 0;
-
-  //We need 3 helper functions to figure all this out:
-  //A.Find the sprite's corners
-  function getPoints(s) {
-    return {
-      topLeft: {
-        x: s.p.x,
-        y: s.p.y
-      },
-      topRight: {
-        x: s.p.x + s.width - 1,
-        y: s.p.y
-      },
-      bottomLeft: {
-        x: s.p.x,
-        y: s.p.y + s.height - 1
-      },
-      bottomRight: {
-        x: s.p.x + s.width - 1,
-        y: s.p.y + s.height - 1
-      }
-    };
-  }
-
-  //B. Get the map array index number
-  function getIndex(point) {
-    let index = {};
-    //Convert pixel coordinates to map coordinates
-    index.x = Math.floor(point.x / tileWidth);
-    index.y = Math.floor(point.y / tileHeight);
-    //Return the index number
-    return index.x + (index.y * mapWidth);
-  }
-
-  //C. Check the points for a collision
-  function checkPoints(key) {
-    //Convert the point's xy coordinate to its matching index number
-    collision.index = getIndex(points[key]);
-    //Find the grid id number of that same cell in the array
-    let gid = array[collision.index];
-    //If the grid id matches the `tileToFind`, return `true`
-    if (gid === tileToFind) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  //Here's where the main logic starts.
-  //Which points do we want to check?
-  //"every", "some" or "center"?
-  switch (pointsToCheck) {
-    case "center":
-      //`hit` will be true if only the center point is touching
-      points = {
-        center: sprite.center
-      };
-      collision.hit = Object.keys(points).some(checkPoints);
-      break;
-    case "every":
-      //`hit` will be true if every point is touching
-      points = getPoints(sprite);
-      collision.hit = Object.keys(points).every(checkPoints);
-      break;
-    case "some":
-      //`hit` will be true only if some points are touching
-      points = getPoints(sprite);
-      collision.hit = Object.keys(points).some(checkPoints);
-      break;
-  }
-
-  //Return the collision object that contains the true/false
-  //value of `collision.hit` and the map array location in `collision.index`
-  return collision;
-}
-
-/*
-Contain
--------
-
-Keep a sprite contained within a rectangular area.
-The first argument is a sprite, the next 4 arguments
-define a rectangular area
-
-    contain(sprite, containerX, containerY, containerWidth, containerHeight, bounce);
-
-*/
-
-export function contain(
-    s, x, y, width, height, 
-    bounce = false, extra = undefined
-  ){
-
-  //The `collision` object is used to store which 
-  //side of the containing rectangle the sprite hits
-  let collision;
-
-  //Left
-  if (s.x < x) {
-    if (bounce) s.vx *= -1;
-    s.x = x;
-    collision = "left";
-  }
-  //Top
-  if (s.y < y) {
-    if (bounce) s.vy *= -1;
-    s.y = y;
-    collision = "top";
-  }
-  //Right
-  if (s.x + s.width > width) {
-    if (bounce) s.vx *= -1;
-    s.x = width - s.width;
-    collision = "right";
-  }
-  //Bottom
-  if (s.y + s.height > height) {
-    if (bounce) s.vy *= -1;
-    s.y = height - s.height;
-    collision = "bottom";
-  }
-
-  //The the `extra` function if there was a collision
-  //and `extra` has been defined
-  if (collision && extra) extra(collision);
-  
-  //Return a the `collision` object   
-  return collision;
 }
 
 /*
@@ -721,23 +916,23 @@ A convenient universal collision function to test for collisions
 between rectangles, circles, and points.
 */
 
-export function hit(a, b, react = false, bounce = false, extra = undefined) {
-  let collision;
-  let aIsASprite = a instanceof PIXI.DisplayObject; // || a instanceof Sprite;
-  let bIsASprite = b instanceof PIXI.DisplayObject; // || a instanceof Sprite;
+export
+function hit(a, b, react = false, bounce = false, global, extra = undefined) {
+  let collision,
+    aIsASprite = a.parent !== undefined,
+    bIsASprite = b.parent !== undefined;
 
   //Check to make sure one of the arguments isn't an array
-  if (aIsASprite && b instanceof Array 
-  || bIsASprite  && a instanceof Array) {
+  if (aIsASprite && b instanceof Array || bIsASprite && a instanceof Array) {
     //If it is, check for a collision between a sprite and an array
     spriteVsArray();
   } else {
     //If one of the arguments isn't an array, find out what type of
     //collision check to run
-    collision = findCollisionType(a, b); 
+    collision = findCollisionType(a, b);
     if (collision && extra) extra(collision);
   }
-  
+
   //Return the result of the collision.
   //It will be `undefined` if there's no collision and `true` if 
   //there is a collision. `rectangleCollision` sets `collsision` to
@@ -745,18 +940,21 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
   //collision is occuring on
   return collision;
 
-  function findCollisionType (a, b) {
+  function findCollisionType(a, b) {
     //Are `a` and `b` both sprites?
     //(We have to check again if this function was called from
     //`spriteVsArray`)
-    let aIsASprite = a instanceof PIXI.DisplayObject; // || a instanceof Sprite;
-    let bIsASprite = b instanceof PIXI.DisplayObject; // || a instanceof Sprite;
+    let aIsASprite = a.parent !== undefined;
+    let bIsASprite = b.parent !== undefined;
 
     if (aIsASprite && bIsASprite) {
       //Yes, but what kind of sprites?
-      if(a.diameter && b.diameter) {
-        //They're cicles
+      if (a.diameter && b.diameter) {
+        //They're circles
         return circleVsCircle(a, b);
+      } else if (a.diameter && !b.diameter) {
+        //The first one is a circle and the second is a rectangle
+        return circleVsRectangle(a, b);
       } else {
         //They're rectangles
         return rectangleVsRectangle(a, b);
@@ -764,16 +962,15 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
     }
     //They're not both sprites, so what are they?
     //Is `a` not a sprite and does it have x and y properties?
-    else if (a.x && a.y && bIsASprite) {
+    else if (bIsASprite && !(a.x === undefined) && !(a.y === undefined)) {
       //Yes, so this is a point vs. sprite collision test
       return hitTestPoint(a, b);
-    }
-    else {
+    } else {
       //The user is trying to test some incompatible objects
       throw new Error(`I'm sorry, ${a} and ${b} cannot be use together in a collision test.'`);
     }
   }
-  
+
   function spriteVsArray() {
     //If `a` happens to be the array, flip it around so that it becomes `b`
     if (a instanceof Array) {
@@ -782,7 +979,7 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
     //Loop through the array in reverse
     for (let i = b.length - 1; i >= 0; i--) {
       let sprite = b[i];
-      collision = findCollisionType(a, sprite); 
+      collision = findCollisionType(a, sprite);
       if (collision && extra) extra(collision, sprite);
     }
   }
@@ -790,29 +987,20 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
   function circleVsCircle(a, b) {
     //If the circles shouldn't react to the collision,
     //just test to see if they're touching
-    if(!react) {
+    if (!react) {
       return hitTestCircle(a, b);
-    } 
-    //Yes, the cicles should react to the collision
+    }
+    //Yes, the circles should react to the collision
     else {
       //Are they both moving?
       if (a.vx + a.vy !== 0 && b.vx + b.vy !== 0) {
         //Yes, they are both moving
         //(moving circle collisions always bounce apart so there's
         //no need for the third, `bounce`, argument)
-        return movingCircleCollision(a, b);
-      }
-      else {
+        return movingCircleCollision(a, b, global);
+      } else {
         //No, they're not both moving
-        //Should they bounce apart?
-        //Yes
-        if(bounce) {
-          return circleCollision(a, b, false);
-        } 
-        //No
-        else {
-          return circleCollision(a, b, true); 
-        }
+        return circleCollision(a, b, bounce, global);
       }
     }
   }
@@ -820,131 +1008,20 @@ export function hit(a, b, react = false, bounce = false, extra = undefined) {
   function rectangleVsRectangle(a, b) {
     //If the rectangles shouldn't react to the collision, just
     //test to see if they're touching
-    if(!react) {
-      return hitTestRectangle(a, b);
-    } 
-    //Yes
-    else {
-      //Should they bounce apart?
-      //Yes
-      if(bounce) {
-        return rectangleCollision(a, b, true);
-      } 
-      //No
-      else {
-        return rectangleCollision(a, b, false); 
-      }
-    }
-  }
-}
-
-/*
-Tile based collision functions
-*/
-
-//The `getIndex` helper function
-//converts a sprite's x and y position to an array index number.
-//It returns a single index value that tells you the map array
-//index number that the sprite is in
-function getIndex (x, y, tilewidth, tileheight, mapWidthInTiles) {
-  let index = {};
-  //Convert pixel coordinates to map index coordinates
-  index.x = Math.floor(x / tilewidth);
-  index.y = Math.floor(y / tileheight);
-  //Return the index number
-  return index.x + (index.y * mapWidthInTiles);
-};
-
-//The `getPoints` function takes a sprite and returns
-//and object that tells you what all its corner points are
-function getPoints(s) {
-  let ca = s.collisionArea;
-  if (ca !== undefined) {
-    return {
-      topLeft: {x: s.x + ca.x, y: s.y + ca.y},
-      topRight: {x: s.x + ca.x + ca.width, y: s.y + ca.y},
-      bottomLeft: {x: s.x + ca.x, y: s.y + ca.y + ca.height},
-      bottomRight: {x: s.x + ca.x + ca.width, y: s.y + ca.y + ca.height}
-    }; 
-  } else {
-    return {
-      topLeft: {x: s.x, y: s.y},
-      topRight: {x: s.x + s.width - 1, y: s.y},
-      bottomLeft: {x: s.x, y: s.y + s.height - 1},
-      bottomRight: {x: s.x + s.width - 1, y: s.y + s.height - 1}
-    }; 
-  }
-}
-
-//`hitTestTile` function
-function hitTestTile(sprite, mapArray, collisionGid, world, pointsToCheck = "some") {
-  //The collision object that will be returned by this functon
-  let collision = {}; 
-
-  //Which points do you want to check?
-  //"every", "some" or "center"?
-  switch (pointsToCheck) {
-    case "center":
-      //`hit` will be true only if the center point is touching 
-      let ca = sprite.collisionArea,
-          point = {},
-          s = sprite;
-      if (sprite.collisionArea !== undefined) {
-        point = {
-          center: {
-            x: s.x + ca.x + (ca.width / 2),
-            y: s.y + ca.y + (ca.height / 2)
-          }
-        };
-      } else {
-        point = {center: {x: sprite.centerX, y: sprite.centerY}};
-      }
-      sprite.collisionPoints = point;
-      collision.hit = Object.keys(sprite.collisionPoints).some(checkPoints);
-      break;
-    case "every":
-      //`hit` will be true if every point is touching
-      sprite.collisionPoints = getPoints(sprite); 
-      collision.hit = Object.keys(sprite.collisionPoints).every(checkPoints);
-      break;
-    case "some":
-      //`hit` will be true only if some points are touching
-      sprite.collisionPoints = getPoints(sprite); 
-      collision.hit = Object.keys(sprite.collisionPoints).some(checkPoints);
-      break;
-  }
-
-  //Loop through the sprite's corner points to find out if they are inside 
-  //an array cell that you're interested in. Return `true` if they are
-  
-  function checkPoints(key) {
-    //Get a reference to the current point to check. 
-    //(`topLeft`, `topRight`, `bottomLeft` or `bottomRight` )
-    let point = sprite.collisionPoints[key];
-
-    //Find the point's index number in the map array
-    collision.index = getIndex(
-      point.x, point.y, 
-      world.tilewidth, world.tileheight, world.widthInTiles
-    );
-
-    //Find out what the gid value is in the map position
-    //that the point is currently over
-    let currentGid = mapArray[collision.index];
-
-    //If it matches the value of the gid that we're interested, in
-    //then there's been a collision
-    if (currentGid === collisionGid) { 
-      return true;
+    if (!react) {
+      return hitTestRectangle(a, b, global);
     } else {
-      return false;
+      return rectangleCollision(a, b, bounce, global);
     }
   }
 
-  //Return the collision object.
-  //`collision.hit` will be true if a collision is detected.
-  //`collision.index` tells you the map array index number where the
-  //collision occured
-  return collision;
+  function circleVsRectangle(a, b) {
+    //If the rectangles shouldn't react to the collision, just
+    //test to see if they're touching
+    if (!react) {
+      return hitTestCircleRectangle(a, b, global);
+    } else {
+      return circleRectangleCollision(a, b, bounce, global);
+    }
+  }
 }
-
